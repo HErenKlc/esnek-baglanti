@@ -40,6 +40,9 @@ Anlatım       Pano (risk cümlesi, eğri, ısı haritası)  ·  YZ planlama not
 | `model/pdf_tablo.py`, `trafo_birlestir.py` | TEİAŞ kapasite PDF'lerinin ayrıştırılması ve birleştirilmesi |
 | `model/osm_konum.py` | TM'lerin OpenStreetMap'teki gerçek saha konumlarıyla eşleştirilmesi |
 | `model/gerilim_dogrulama.py` | Kısa hat gerilim formülünün pandapower yük akışıyla doğrulanması |
+| `model/fider_duyarlilik.py` | Basit gerilim kontrolünün gerçekçi OG fiderinde hâlâ geçerli olup olmadığı |
+| `model/kisa_devre.py` | Eviricili GES'in arıza akımına katkısı ve rölenin gördüğü akıma etkisi (IEC 60909) |
+| `model/baglanti_etut_notu.md` | Yük ölçümü, gerilim ve koruma: ne yapıldı, ne yapılamaz, sınır nerede |
 | `model/edas_veri_talebi.md`, `bilgi_edinme_basvurusu.md`, `epdk_pilot_onerisi.md` | Veri talepleri ve pilot önerisi |
 | `web/src/veri` | Open-Meteo istemcisi, TEİAŞ TM tablosu, EDAŞ ölçüm okuyucusu |
 | `web/src/sim` | PVWatts GES modeli, senaryo kurma, kısıntı, batarya, fider gerilimi |
@@ -57,6 +60,8 @@ python train.py
 
 pip install pandapower
 python gerilim_dogrulama.py
+python fider_duyarlilik.py
+python kisa_devre.py
 
 # Web
 cd web && npm install
@@ -75,9 +80,10 @@ npm run dev       # http://localhost:5173
 | TM üst sınırı, tahsisli güç | TEİAŞ TM bazlı kalan kapasite tablosu, 01.10.2026 (794 TM, 81 il) | Resmî |
 | TM konumu | OpenStreetMap `power=substation` (≥66 kV); 794 TM'nin 667'si gerçek saha konumundan | Açık veri, il sınırıyla denetlendi |
 | Emisyon faktörü | ETKB 2023 şebeke emisyon faktörü; GES yaşam döngüsü IPCC AR5 | Resmî, alt/üst senaryolu |
-| Bağlantı hattı gerilimi | Kısa hat formülü, pandapower ile doğrulandı | Mühendislik hesabı, isteğe bağlı |
+| Bağlantı hattı gerilimi | Kısa hat formülü, pandapower ile doğrulandı | Tahsisli hatta muhafazakâr; paylaşılan fiderde iyimser olabilir |
+| Koruma ve kısa devre | IEC 60909, pandapower | İlk sayı hesaplandı; etüt EDAŞ'ta |
 | TM saatlik yükü | Yayımlanmıyor; ölçüm yüklenebilir | Ana sayı bu veriyi kullanmaz |
-| N-1, koruma, kısa devre | — | Bilerek kapsam dışı |
+| N-1 güvenlik kriteri | — | Bilerek kapsam dışı |
 
 ## Yük modeli: 2025 test yılı (eğitimde görülmedi)
 
@@ -96,6 +102,17 @@ Geri test 8 yıl: her yıl, kendisini hiç görmemiş bir modelle sınandı. Yed
 
 `web/src/sim/fider.ts` içindeki kısa hat formülü (ΔU ≈ L·(R·P − X·Q)/U²), pandapower Newton-Raphson yük akışına karşı 150 durumda sınandı (3 iletken × 5 mesafe × 2 cosφ × 6 güç seviyesi). Sonuç: **25 kapasite durumunun hiçbirinde formül gerçek kapasiteden büyük bir sayı vermiyor**; çalışma aralığında en iyimser gerilim sapması 0,02 puan. cosφ<1'de sapma büyüyor, çünkü R·P ile X·Q birbirini götürünce ihmal edilen ikinci dereceden terim göreli olarak büyüyor — yönü yine muhafazakâr. Üretici: `model/gerilim_dogrulama.py` → `web/public/gerilim_dogrulama.json`.
 
+**Ama varsayımın kendisi her zaman güvenli değil.** `model/fider_duyarlilik.py`, aynı hesabı gerçekçi bir OG fiderinde tekrarlıyor (10 bara, dağıtık yük, gerilim sınırı her barada aranıyor). Tüketici yükü ve fiderin ortasına bağlanma kontrolü daha da muhafazakâr yapıyor; ama **aynı fiderde başka üretim varsa kontrol iyimser hale geliyor** — fiderde 20 MW mevcut GES varken basit kontrol 16,64 MW diyor, gerçek sınır 7,58 MW. Paylaşılan fiderde bu sayıya güvenilmemeli. Bulgu arayüzün dürüstlük tablosunda yazılı.
+
+## Koruma: etüt değil, etüdün ilk sayısı
+
+Koruma etüdü röle ayarları ve akım trafosu oranları olmadan yapılamaz; bunlar yayımlanmaz. `model/kisa_devre.py` etüdün başladığı iki sayıyı hesaplıyor (IEC 60909, 3 faz, pandapower):
+
+- **Ekipman dayanımı sorun değil.** Eviricili GES arıza akımını anma akımının 1,1 katıyla sınırlar; 40 MW'lık santral toplam arıza akımını %22 artırıyor (3,30 → 4,04 kA). Senkron makinenin 5–6 katlık katkısının yanında küçük.
+- **Ara besleme (infeed) asıl soru.** Santral arızaya kendi payını bastığı için TM rölesi arıza akımının tamamını görmez: 40 MW'ta görmediği pay %19,1. Röle ayarı buna göre gözden geçirilmezse açma süresi uzar. Esnek bağlantıda bağlanan güç statik kuraldan büyük olduğu için bu etüt önkoşuldur.
+
+Ayrıntı ve hâlâ EDAŞ'tan gereken veri listesi: `model/baglanti_etut_notu.md`.
+
 ## Atıf ve lisans
 
 - Hava: [Open-Meteo](https://open-meteo.com) (CC BY 4.0), ERA5 — Copernicus Climate Change Service bilgisi kullanılmıştır.
@@ -105,4 +122,4 @@ Geri test 8 yıl: her yıl, kendisini hiç görmemiş bir modelle sınandı. Yed
 - GES modeli: [pvlib-python](https://github.com/pvlib/pvlib-python) PVWatts ve Faiman modellerinin TypeScript uyarlaması.
 - Yük akışı: [pandapower](https://pandapower.org).
 
-Bu bir prototiptir. Gerçek bağlantı kararı için EDAŞ yük ölçümü, gerilim ve koruma etütleri gerekir.
+Bu bir prototiptir ve bağlantı etüdünün yerine geçmez. Gerçek bağlantı kararı için EDAŞ'ın SCADA yük ölçümü, fiderin tamamını kapsayan gerilim etüdü ve röle ayarlarıyla yapılan koruma etüdü gerekir. Bu üç başlıkta nerede durulduğu — ne yapıldı, ne yapılamaz, hangi veri hâlâ eksik — `model/baglanti_etut_notu.md` içinde yazılı.
