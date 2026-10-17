@@ -42,22 +42,56 @@ def metin(pdf: Path) -> str:
 
 
 def tabloya(ham: str) -> "OrderedDict[tuple, float]":
-    """Bir TM birden çok satırda olabilir (bara/EDAŞ kırılımı); toplanır."""
+    """Bir TM birden çok satıra yayılabilir ve adı bloğun ORTASINDA olabilir:
+
+        ADANA                      Toroslar EDAŞ   0,00
+                     KOZAN TM  Tek                        <- ad burada, kapasitesiz
+        ADANA                      Kozan OSB       0,00
+
+    Bu yüzden adsız kapasite satırları bekletilir. Yalnızca ad taşıyan satır
+    gelince bekleyenler O ada yazılır (ad bloğun ortasındaydı); ad + kapasite
+    taşıyan satır gelince bekleyenler bir ÖNCEKİ ada, satırın kendi kapasitesi
+    yeni ada yazılır.
+    """
     tm = OrderedDict()
-    il = ad = None
+    ili = {}
+    il = aktif = None
+    bekleyen = []
+
+    def yaz(ad, deger):
+        if ad is None:
+            return
+        anahtar = (ili.get(ad) or "", ad)
+        tm[anahtar] = tm.get(anahtar, 0.0) + deger
+
     for satir in ham.split("\n"):
-        m = KAPASITE.match(satir.rstrip())
-        if not m:
+        duz = satir.rstrip()
+        if not duz.strip():
             continue
-        parcalar = re.split(r"\s{2,}", m.group(1).strip())
+        m = KAPASITE.match(duz)
+        parcalar = re.split(r"\s{2,}", (m.group(1) if m else duz).strip())
         if parcalar and parcalar[0].strip() in IL81:
             il = parcalar[0].strip()
-        bulunan = next((p.strip() for p in parcalar if p.strip().endswith("TM")), None)
-        if bulunan:
-            ad = bulunan
-        if il and ad:
-            deger = float(m.group(2).replace(".", "").replace(",", "."))
-            tm[(il, ad)] = tm.get((il, ad), 0.0) + deger
+        ad = next((p.strip() for p in parcalar if p.strip().endswith("TM")), None)
+        deger = float(m.group(2).replace(".", "").replace(",", ".")) if m else None
+
+        if ad:
+            ili.setdefault(ad, il)
+            if deger is None:
+                aktif = ad
+                for d in bekleyen:
+                    yaz(aktif, d)
+            else:
+                for d in bekleyen:
+                    yaz(aktif, d)
+                aktif = ad
+                yaz(aktif, deger)
+            bekleyen = []
+        elif deger is not None:
+            bekleyen.append(deger)
+
+    for d in bekleyen:
+        yaz(aktif, d)
     return tm
 
 
