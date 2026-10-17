@@ -119,6 +119,7 @@ table.veri td.r { font-family: var(--rakam); font-size: 1rem; text-align: right;
 .etiket.gercek { background: #d8ebe1; color: #1d5a3f; }
 .etiket.varsayim { background: #f7e7c2; color: #7a5204; }
 .etiket.kapsamdisi { background: #f4d6d1; color: #8a2a1e; }
+.etiket.istege { background: #e4e9f0; color: #3c4a5c; }
 
 .durum { padding: 60px 0; color: var(--murekkep-2); }
 .durum.hata { color: var(--kisinti); }
@@ -174,3 +175,11 @@ td.tuttu, span.tuttu { color: var(--uygun); }
   .merdiven li { grid-template-columns: 1.8rem minmax(0, 1fr) auto; }
   .merdiven .m-not { grid-column: 2 / -1; }
 }
+
+/* EDAŞ ölçümü yükleme (pilot) */
+.olcum-durum { font-size: 0.82rem; margin: 6px 0 2px; }
+.olcum-durum.tamam { color: var(--uygun); }
+.olcum-durum.hata { color: #8a2a1e; }
+.kucuk-dugme { font-size: 0.78rem; padding: 3px 8px; margin-top: 5px; }
+.merdiven li.m-aktif .m-sayi { color: var(--uygun); font-weight: 700; }
+#olcumDosya { font-size: 0.8rem; width: 100%; margin-bottom: 2px; }

@@ -1,8 +1,9 @@
 import "./stil.css";
 import { TRAFOLAR, TRAFO_KAYNAK, KONUM_KAYNAK, type Trafo } from "./veri/trafolar";
+import { olcumAyristir, type OlcumSonucu } from "./veri/olcum";
 import { havaGetir, HAVA_KAYNAK, HAVA_YILLARI, type HavaSonucu } from "./veri/hava";
 import {
-  senaryolarKur, altSinirSenaryolari, pvYillari, dagilim, enYuksekEkMW, egri, statikKalan,
+  senaryolarKur, olcumSenaryolari, altSinirSenaryolari, pvYillari, dagilim, enYuksekEkMW, egri, statikKalan,
   type YukKantilleri, type Senaryolar, type TrafoGirdisi, type BataryaGirdisi,
 } from "./sim/kisinti";
 import { egriGrafigi, isiHaritasi, dogrulamaGrafigi } from "./ui/grafik";
@@ -94,6 +95,8 @@ function urlYaz() {
 }
 
 let yk: YukKantilleri;
+/** EDAŞ SCADA ölçümü yüklendiyse yük varsayımı devreden çıkar (kanıt merdiveni 3. basamak). */
+let olcum: (OlcumSonucu & { ad: string }) | null = null;
 let geriTest: GeriTestVerisi | null = null;
 
 /** TEİAŞ'ın iki tarihli resmî tablosunun özeti; hesap değil, fotoğraf (model/ulusal_ozet.py). */
@@ -130,6 +133,12 @@ app.innerHTML = `
       <label for="yuk">TM yük tepe değeri <span class="deger" id="yukD"></span></label>
       <input id="yuk" type="range" min="10" max="120" step="1" />
       <small>Varsayım: TM yükü açık veri değil. Şekil gerçek EPİAŞ verisinden. Kanıt merdiveninin ilk basamağı bu varsayımı hiç kullanmaz.</small>
+
+      <label for="olcumDosya">EDAŞ ölçümü (pilot)</label>
+      <input id="olcumDosya" type="file" accept=".csv,.txt,text/csv,text/plain" />
+      <div id="olcumDurum" class="olcum-durum"></div>
+      <small>Dağıtım şirketinden 8.760 saatlik TM yükü (MW) gelirse buraya yükleyin: varsayım tamamen kalkar,
+        aralık tek sayıya iner. Tek sütun ya da "tarih;MW" biçimi; dosya tarayıcıdan çıkmaz.</small>
 
       <label for="hedef">Kabul edilen yıllık kısıntı <span class="deger" id="hedefD"></span></label>
       <input id="hedef" type="range" min="1" max="15" step="0.5" />
@@ -218,6 +227,7 @@ function ayarlariBagla() {
   let zaman: number | undefined;
   const gecikmeli = (yeniSenaryo: boolean) => { goster(); clearTimeout(zaman); zaman = window.setTimeout(() => yenile(yeniSenaryo), 180); };
   yuk.addEventListener("input", () => { durum.yukTepeMW = +yuk.value; gecikmeli(true); });
+  ($("olcumDosya") as HTMLInputElement).addEventListener("change", olcumYukle);
   hedef.addEventListener("input", () => { durum.hedef = +hedef.value / 100; gecikmeli(false); });
   batG.addEventListener("change", () => { durum.bataryaOrani = Math.max(0, +batG.value / 100); gecikmeli(false); });
   batS.addEventListener("change", () => { durum.bataryaSaat = Math.max(0, +batS.value); gecikmeli(false); });
@@ -249,7 +259,8 @@ async function yenile(yeniSenaryo: boolean) {
     if (yeniSenaryo || !sc) {
       ana.innerHTML = `<div class="durum">${t.ad} için Open-Meteo'dan ${HAVA_YILLARI[0]}–${HAVA_YILLARI.at(-1)} saatlik hava verisi (20 yıl) alınıyor ve senaryolar kuruluyor…</div>`;
       hava = await havaGetir(t.enlem, t.boylam);
-      sc = senaryolarKur(hava.yillar, yk, girdi);
+      sc = olcum ? olcumSenaryolari(hava.yillar, olcum.deger, t.maksMW)
+                 : senaryolarKur(hava.yillar, yk, girdi);
     }
   } catch (e) {
     ana.innerHTML = `<div class="durum hata"><p>Hava verisi alınamadı: ${(e as Error).message}</p>
@@ -284,6 +295,8 @@ async function yenile(yeniSenaryo: boolean) {
   // Varsayımsız etki: yalnızca alt sınırın (yük bilgisi kullanmayan) getirdiği ek enerji.
   const ekMWhAlt = ekEnerji(altSc, girdi, altSinir, statik);
   const co2Alt = ekMWhAlt * efNet(), co2AltMuh = ekMWhAlt * efNet(EF.bm.deger);
+  // Emisyon bandı: ETKB 2023'ün üç resmî marjı. Yapı marjı = düşük, kombine = orta, işletme = yüksek.
+  const co2AltDus = ekMWhAlt * efNet(EF.bm.deger), co2AltYuk = ekMWhAlt * efNet(EF.om.deger);
   const dAlt = dagilim(altSc, girdi, Math.max(altSinir, 0.01));
   const kisintiAlt = durum.istatistik === "p90" ? dAlt.p90 : dAlt.p50;
 
@@ -330,7 +343,7 @@ async function yenile(yeniSenaryo: boolean) {
       <div class="olcum vurgu"><div class="ad">Varsayımsız alt sınır</div><div class="sayi">${tr(altSinir)}<small>MW</small></div><div class="ek">yük bilgisi kullanılmadan</div></div>
       <div class="olcum"><div class="ad">Yük bilgisiyle</div><div class="sayi">${tr(esnek)}<small>MW</small></div><div class="ek">${fiderMW() ? "hat sınırı dahil" : `yük ±%50 ile ${tr(esnekAlt)}–${tr(esnekUst)} MW`}</div></div>
       <div class="olcum"><div class="ad">Bataryayla</div><div class="sayi">${bat ? tr(esnekBat) : "–"}<small>${bat ? "MW" : ""}</small></div><div class="ek">${bat ? `${tr(bat.gucMW, 0)} MW / ${tr(bat.enerjiMWh, 0)} MWh, verim %88` : "batarya kapalı"}</div></div>
-      <div class="olcum"><div class="ad">Net önlenen emisyon</div><div class="sayi">${tr(co2Alt / 1000, 1)}<small>bin tCO₂/yıl</small></div><div class="ek">varsayımsız · ${tr(ekMWhAlt / 1000, 1)} GWh · muhafazakâr ${tr(co2AltMuh / 1000, 1)} bin</div></div>
+      <div class="olcum"><div class="ad">Net önlenen emisyon</div><div class="sayi">${tr(co2Alt / 1000, 1)}<small>bin tCO₂/yıl</small></div><div class="ek">varsayımsız · ${tr(ekMWhAlt / 1000, 1)} GWh · band ${tr(co2AltDus / 1000, 1)}–${tr(co2AltYuk / 1000, 1)} bin</div></div>
     </div>
 
     <section class="bolum">
@@ -341,8 +354,10 @@ async function yenile(yeniSenaryo: boolean) {
           <span class="m-not">Tek kural: toplam üretim TEİAŞ'ın yayımladığı ${tr(t.maksMW)} MW'ı aşmasın. Yük her an en düşük kabul edilir. Kazanç sadece gerçek havadan: GES nadiren tam güçte üretir.</span></li>
         <li><span class="m-ad">Gerçek yük şekliyle</span><span class="m-sayi">${Math.round(esnekAlt) === Math.round(esnekUst) ? tr(esnekAlt) : `${tr(esnekAlt)}–${tr(esnekUst)}`} MW</span>
           <span class="m-not">EPİAŞ saatlik yük şekli, TM yük tepesi ${tr(durum.yukTepeMW * 0.5)}–${tr(durum.yukTepeMW * 1.5)} MW aralığında. Seçili varsayımla ${tr(esnek)} MW.</span></li>
-        <li><span class="m-ad">EDAŞ ölçümüyle</span><span class="m-sayi">pilot</span>
-          <span class="m-not">TM'nin kendi SCADA yükü girilince aralık tek sayıya iner. Yöntem değişmez, sadece girdi değişir.</span></li>
+        <li${olcum ? ' class="m-aktif"' : ""}><span class="m-ad">EDAŞ ölçümüyle</span><span class="m-sayi">${olcum ? `${tr(esnek)} MW` : "pilot"}</span>
+          <span class="m-not">${olcum
+            ? `<b>${olcum.ad}</b> yüklendi: ${olcum.satir.toLocaleString("tr")} saat, tepe ${tr(olcum.tepeMW, 1)} MW, en düşük gündüz yükü ${tr(olcum.enDusukGunduzMW, 1)} MW. Yük varsayımı devrede değil; aralık tek sayıya indi.`
+            : "TM'nin kendi SCADA yükü girilince aralık tek sayıya iner. Yöntem değişmez, sadece girdi değişir. Soldaki \"EDAŞ ölçümü\" alanından yüklenir."}</span></li>
       </ol>
     </section>
 
@@ -440,10 +455,12 @@ async function yenile(yeniSenaryo: boolean) {
           <tr><td>Trafo merkezi konumu</td><td>OpenStreetMap, <code>power=substation</code> (≥66 kV). Bölgedeki ${KONUM_KAYNAK.toplam} TM'nin ${KONUM_KAYNAK.osm}'si gerçek saha konumundan, ${KONUM_KAYNAK.ilce}'i ilçe merkezinden. Ulusal tabloda ${KONUM_KAYNAK.ulusalOsm}/${KONUM_KAYNAK.ulusalToplam}. Eşleşmeler il merkezine 200 km sınırıyla denetlendi; ilk denemede il dışına düşen 48 kayıt elendi.</td><td><span class="etiket gercek">açık veri, doğrulandı</span></td></tr>
           <tr><td>Emisyon faktörü</td><td>ETKB 2023 Ulusal Elektrik Şebekesi Emisyon Faktörü Bilgi Formu (UNFCCC CDM yöntemi); GES yaşam döngüsü IPCC AR5.</td><td><span class="etiket gercek">resmî</span></td></tr>
           <tr><td>GES üretimi</td><td>PVWatts modeli (pvlib-python ile birebir doğrulandı), DC/AC 1,2, kayıp %14.</td><td><span class="etiket gercek">standart model</span></td></tr>
-          <tr><td>TM yük büyüklüğü</td><td><b>Ana sayı (${tr(altSinir)} MW) bu satırı hiç kullanmaz.</b> Yalnızca "yük bilgisiyle" üst senaryosunda devreye girer: ulusal şekil ${tr(durum.yukTepeMW)} MW tepeye ölçeklenir, en düşük gündüz yükü ${tr(s.enDusukGunduzYukMW, 1)} MW, ters akış sınırı ${tr(s.ihracatLimitiMW, 1)} MW. TM bazında gerçek yük Türkiye'de yayımlanmıyor (TEİAŞ YTBS topluyor, yayımlamıyor); EDAŞ'ın SCADA ölçümü girilince bu satır kalkar.</td><td><span class="etiket varsayim">yalnızca üst senaryoda</span></td></tr>
-          <tr><td>Tahsisli güç tamamen GES</td><td>Tablo GES+RES toplamı veriyor; Konya-Karaman'da büyük çoğunluk GES.</td><td><span class="etiket varsayim">varsayım</span></td></tr>
-          <tr><td>Bağlantı hattı gerilimi</td><td>${fider ? `${tr(fider, 1)} MW sınır uygulanıyor (kısa hat formülü, katalog iletken verisi).` : "Hat kontrolü kapalı."} Ayrıntılı yük akışı (pandapower) bağlantı etüdünün işi.</td><td><span class="etiket ${fider ? "gercek" : "kapsamdisi"}">${fider ? "mühendislik hesabı" : "kapalı"}</span></td></tr>
-          <tr><td>N-1, koruma, kısa devre</td><td>Bağlantı etüdünün konusu; bu araç kapasite ve kısıntı sorusunu cevaplar.</td><td><span class="etiket kapsamdisi">kapsam dışı</span></td></tr>
+          <tr><td>TM yük büyüklüğü</td><td>${olcum
+            ? `<b>EDAŞ ölçümü yüklendi (${olcum.ad}).</b> Varsayım yok: ${olcum.satir.toLocaleString("tr")} saatlik gerçek çekiş verisi, tepe ${tr(olcum.tepeMW, 1)} MW. ${olcum.uyari ?? ""}`
+            : `<b>Ana sayı (${tr(altSinir)} MW) bu satırı hiç kullanmaz.</b> Yalnızca "yük bilgisiyle" üst senaryosunda devreye girer: ulusal şekil ${tr(durum.yukTepeMW)} MW tepeye ölçeklenir, en düşük gündüz yükü ${tr(s.enDusukGunduzYukMW, 1)} MW, ters akış sınırı ${tr(s.ihracatLimitiMW, 1)} MW. TM bazında gerçek yük Türkiye'de yayımlanmıyor (TEİAŞ YTBS topluyor, yayımlamıyor); EDAŞ'ın SCADA ölçümü girilince bu satır kalkar.`}</td><td><span class="etiket ${olcum ? "gercek" : "varsayim"}">${olcum ? "gerçek ölçüm" : "yalnızca üst senaryoda"}</span></td></tr>
+          <tr><td>Tahsisli gücün kaynağı</td><td>TEİAŞ tablosu GES ve RES'i tek sütunda veriyor. Mevcut santraller GES kabul edilir; RES olsaydı üretim profili farklı olur, öğle tepesi yerine gece de üretim olurdu. Konya-Karaman'da lisanssız kurulu gücün büyük çoğunluğu GES (bölge rüzgâr sınıfı düşük). Ayrıştırma için santral bazlı kaynak türü gerekir; EPDK lisanssız üretim listesi bunu içeriyor ancak TM eşleşmesi yok.</td><td><span class="etiket varsayim">varsayım, etkisi sınırlı</span></td></tr>
+          <tr><td>Bağlantı hattı gerilimi</td><td>${fider ? `${tr(fider, 1)} MW sınır uygulanıyor.` : "Soldan hat uzunluğu ve iletken seçilince açılır; şu an kapalı."} Kısa hat formülü (ΔU ≈ L·(R·P − X·Q)/U²) ve katalog iletken verisi (Southwire); %2 sınırı VDE-AR-N 4110. Ayrıntılı yük akışı (pandapower) bağlantı etüdünün işi.</td><td><span class="etiket ${fider ? "gercek" : "istege"}">${fider ? "mühendislik hesabı, açık" : "isteğe bağlı, şu an kapalı"}</span></td></tr>
+          <tr><td>N-1, koruma, kısa devre</td><td>Bilerek kapsam dışı. Hat empedansları ve röle ayarları şebeke güvenliği gerekçesiyle hiçbir ülkede yayımlanmaz; UKPN de bu veriyi kendi içinde tutar. Dayanağı olmayan bir N-1 sayısı üretmektense soruyu bağlantı etüdüne bırakıyoruz. Bu araç kapasite ve kısıntı sorusunu cevaplar.</td><td><span class="etiket kapsamdisi">kapsam dışı, gerekçeli</span></td></tr>
         </tbody>
       </table>
     </section>
@@ -576,6 +593,31 @@ function ulusalBolum(): string {
       <p class="kucuk">Kaynak: ${u.kaynak}. Tablolar <code>model/pdf_tablo.py</code> ile okundu; üretilen toplam
         TEİAŞ'ın duyurduğu rakamla birebir doğrulandı.</p>
     </section>`;
+}
+
+/** EDAŞ'ın saatlik TM yükünü okur. Dosya tarayıcıdan çıkmaz; sunucuya gönderilmez. */
+async function olcumYukle(e: Event) {
+  const girdi = e.currentTarget as HTMLInputElement;
+  const kutu = document.getElementById("olcumDurum")!;
+  const dosya = girdi.files?.[0];
+  if (!dosya) return;
+  try {
+    const sonuc = olcumAyristir(await dosya.text());
+    olcum = { ...sonuc, ad: dosya.name };
+    kutu.className = "olcum-durum tamam";
+    kutu.innerHTML = `<b>${dosya.name}</b> okundu: ${sonuc.satir.toLocaleString("tr")} saat, tepe ${tr(sonuc.tepeMW, 1)} MW.
+      ${sonuc.uyari ? `<br><span class="kucuk">${sonuc.uyari}</span>` : ""}
+      <br><button class="dugme kucuk-dugme" id="olcumSil">Ölçümü kaldır</button>`;
+    document.getElementById("olcumSil")!.addEventListener("click", () => {
+      olcum = null; girdi.value = ""; kutu.className = "olcum-durum"; kutu.textContent = "";
+      yenile(true);
+    });
+    await yenile(true);
+  } catch (hata) {
+    olcum = null; girdi.value = "";
+    kutu.className = "olcum-durum hata";
+    kutu.textContent = (hata as Error).message;
+  }
 }
 
 async function ozetIste() {

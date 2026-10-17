@@ -191,7 +191,7 @@ def main():
         "yontem": secilen["yontem"],
         "veri_kaynagi": "EPİAŞ Şeffaflık Platformu, saatlik gerçek zamanlı tüketim 2022-2025",
         "saatler": Q_norm.tolist(),
-    }, separators=(",", ":")))
+    }, separators=(",", ":")), encoding="utf-8")
 
     # Geri test dosyası: her test yılı için model o yılı GÖRMEDEN kantil üretir
     #   2024: 2022 eğitim, 2023 conformal kalibrasyon
@@ -228,7 +228,7 @@ def main():
         "kantiller": KANTILLER,
         "aciklama": "Her yıl için model o yılı görmedi. gercek ve onceki_yil_gercek: EPİAŞ saatlik tüketim. Aynı ölçek.",
         "yillar": geri,
-    }, separators=(",", ":")))
+    }, separators=(",", ":")), encoding="utf-8")
     eski = CIKTI / "yuk_2025_test.json"
     if eski.exists():
         eski.unlink()
@@ -252,7 +252,7 @@ def main():
             "p95": np.round(Q_goster[hafta, -1], 4).tolist(),
         },
         "yillik_ortalama_MW": {int(k_): round(float(v), 0) for k_, v in ham.groupby(ham.index.year).mean().items()},
-    }, ensure_ascii=False, indent=1))
+    }, ensure_ascii=False, indent=1), encoding="utf-8")
     print("Yazıldı:", CIKTI)
 
 

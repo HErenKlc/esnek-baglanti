@@ -2,7 +2,7 @@
  "veri": "2016-2025",
  "egitim": "2016-2023",
  "kalibrasyon": "2024",
- "test": "2025 (8.760 saat, eðitimde hiç görülmedi)",
+ "test": "2025 (8.760 saat, eÄŸitimde hiÃ§ gÃ¶rÃ¼lmedi)",
  "geri_test_yillari": [
   2018,
   2019,
@@ -15,11 +15,11 @@
  ],
  "sonuclar": [
   {
-   "yontem": "Naif: geçen yýlýn ayný saati (nokta tahmin)",
+   "yontem": "Naif: geÃ§en yÄ±lÄ±n aynÄ± saati (nokta tahmin)",
    "P50_MAPE_yuzde": 5.28
   },
   {
-   "yontem": "Ay × saat × gün tipi empirik kantil",
+   "yontem": "Ay Ã— saat Ã— gÃ¼n tipi empirik kantil",
    "ortalama_pinball": 0.01264,
    "P5_P95_kapsama": 0.874,
    "P50_MAPE_yuzde": 4.44
@@ -31,13 +31,13 @@
    "P50_MAPE_yuzde": 3.23
   },
   {
-   "yontem": "LightGBM kantil + conformal (seçilen aday)",
+   "yontem": "LightGBM kantil + conformal (seÃ§ilen aday)",
    "ortalama_pinball": 0.00962,
    "P5_P95_kapsama": 0.933,
    "P50_MAPE_yuzde": 3.23
   }
  ],
- "secilen": "LightGBM kantil + conformal (seçilen aday)",
+ "secilen": "LightGBM kantil + conformal (seÃ§ilen aday)",
  "conformal_genisletme": 0.018,
  "ornek_hafta": {
   "baslangic": "2025-07-14",

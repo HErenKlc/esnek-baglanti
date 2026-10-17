@@ -67,6 +67,25 @@ export function kantilDegeri(q: number[], k: number[], u: number): number {
   return q[n - 1];
 }
 
+/**
+ * Ölçülmüş TM yükü (EDAŞ SCADA'sından 8.760 saatlik MW dizisi) varsa belirsizlik çekilişi
+ * yapılmaz: her hava yılı tek senaryo üretir ve yük varsayımı tamamen devreden çıkar.
+ * Kanıt merdiveninin üçüncü basamağı budur; pilotta bu yol kullanılır.
+ */
+export function olcumSenaryolari(hava: HavaYili[], olcumMW: Float32Array, maksMW: number): Senaryolar {
+  const pvYil = pvYillari(hava).map((h) => h.pv);
+  const pv: Float32Array[] = [], yuk: Float32Array[] = [], havaYili: number[] = [];
+  for (let w = 0; w < hava.length; w++) {
+    pv.push(pvYil[w]); yuk.push(olcumMW); havaYili.push(hava[w].yil);
+  }
+  let enDusuk = Infinity;
+  for (let i = 0; i < SAAT_YIL; i++) {
+    const s = i % 24;
+    if (s >= 10 && s <= 15) enDusuk = Math.min(enDusuk, olcumMW[i]);
+  }
+  return { n: pv.length, pv, yuk, ihracatLimitiMW: maksMW - enDusuk, enDusukGunduzYukMW: enDusuk, havaYili };
+}
+
 export function senaryolarKur(
   hava: HavaYili[], yk: YukKantilleri, t: TrafoGirdisi, cekilis = 5, seed = 42,
 ): Senaryolar {
