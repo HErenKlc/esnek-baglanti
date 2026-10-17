@@ -588,6 +588,10 @@ function modelTablosu() {
 }
 
 /** Türkiye tablosu: TEİAŞ'ın iki resmî tablosunun karşılaştırması. Simülasyon içermez. */
+// Azami + tahsisli gücün birlikte bilindiği TM sayısı (model/trafolar_birlesik.csv).
+// Simülasyonun teknik olarak yapılabileceği üst sınır bu; uygulamada şu an 25'i açık.
+const BIRLESIK_TM = 183, BIRLESIK_IL = 45;
+
 function ulusalBolum(): string {
   const u = ulusal;
   if (!u) return "";
@@ -613,6 +617,16 @@ function ulusalBolum(): string {
         <tbody>${ilk.map((x) => `<tr><td>${x.il}</td><td class="r">${x.dolu} / ${x.tm}</td>
           <td class="r">${tr(x.kalan, 2)} MWe</td></tr>`).join("")}</tbody>
       </table>
+      <p class="kucuk"><b>Simülasyon neden yalnızca Konya–Karaman'da?</b> İki sebep var, ikisi de bu aracın
+        sınırını tarif ediyor. <b>Birincisi veri:</b> ters akış sınırı için TM'nin <i>azami</i> kapasitesi gerekiyor,
+        TEİAŞ ise yalnızca <i>kalan</i> kapasiteyi yayımlıyor. Azami gücü ikinci bir tabloyla birleştirip
+        ${BIRLESIK_TM} TM / ${BIRLESIK_IL} il için çıkarabildik; kalan ${u.tmSayisi - BIRLESIK_TM} merkez için
+        çıkaramadık. <b>İkincisi ve daha önemlisi:</b> tahsisli gücün tamamını GES saymak Konya'da savunulabilir
+        çünkü bölgede rüzgâr marjinal. Aynı varsayım rüzgârın güçlü olduğu bir ilde <b>yanlış olurdu</b> — rüzgâr
+        gece de ürettiği için ters akış tablosu tamamen değişir. Yani <b>yöntem ulusal ölçeğe taşınabilir, sayılar
+        taşınamaz</b>: her bölge için kaynak karışımı yeniden ölçülmelidir
+        (<code>model/kaynak_kirilimi.py</code> bunu yapar). Bu tablo ulusal bir kapasite iddiası değil, problemin
+        büyüklüğünün fotoğrafıdır.</p>
       <p class="kucuk">Kaynak: ${u.kaynak}. Tablolar <code>model/pdf_tablo.py</code> ile okundu; üretilen toplam
         TEİAŞ'ın duyurduğu rakamla birebir doğrulandı.</p>
     </section>`;

@@ -120,6 +120,15 @@ Koruma etüdü röle ayarları ve akım trafosu oranları olmadan yapılamaz; bu
 
 Ayrıntı ve hâlâ EDAŞ'tan gereken veri listesi: `model/baglanti_etut_notu.md`.
 
+## Yöntemin geçerlilik sınırı
+
+Simülasyon 25 trafo merkezinde (Konya–Karaman) çalışıyor; ulusal tablo 794 merkezi gösteriyor ama orada simülasyon yok. Bunun iki sebebi var ve ikisi de aracın sınırını tarif ediyor:
+
+1. **Veri.** Ters akış sınırı için TM'nin *azami* kapasitesi gerekir; TEİAŞ yalnızca *kalan* kapasiteyi yayımlar. Azami güç ikinci bir tabloyla birleştirilerek 183 TM / 45 il için çıkarıldı, kalan 611 merkez için çıkarılamadı.
+2. **Kaynak karışımı bölgesel.** Tahsisli gücün tamamını GES saymak Konya'da savunulabilir çünkü bölgede rüzgâr marjinal. Aynı varsayım rüzgârın güçlü olduğu bir ilde yanlış olurdu — rüzgâr gece de ürettiği için ters akış tablosu değişir. **Yöntem ulusal ölçeğe taşınabilir, sayılar taşınamaz:** her bölge için kaynak karışımı yeniden ölçülmelidir (`model/kaynak_kirilimi.py`).
+
+Ulusal tablo bu yüzden bir kapasite iddiası değil, problemin büyüklüğünün fotoğrafıdır.
+
 ## Etkinin karşı-olgusal tabanı
 
 Emisyon hesabı "esnek bağlantı olmasaydı bu MW hiç bağlanmazdı" der. Bu bir varsayım olarak bırakılmadı; TEİAŞ'ın kendi tablosuyla sınırlandı.
