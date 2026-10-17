@@ -36,6 +36,10 @@ verilerden sağlayabildiklerinizi paylaşmanız:
    asgari yük ya da örnek bir hafta da çalışmayı anlamlı biçimde ilerletir.
 2. Trafo merkezinin **trafo gücü (MVA)** ve ters güç akışına izin verilen sınır.
 3. Varsa, o TM'ye bağlı mevcut GES'lerin **toplam kurulu gücü**.
+4. Mevcut üretimin **hangi fiderlerde ve fider üzerinde hangi noktada** olduğu.
+   (Bu madde sonradan eklendi: yaptığımız duyarlılık analizi, aynı fiderde başka
+   üretim varsa basit gerilim kontrolünün kapasiteyi fazla gösterdiğini ortaya
+   çıkardı. Fider bilgisi olmadan gerilim sayısı paylaşılan fiderde kullanılamıyor.)
 
 Veriler tüketici bilgisi içermeyen toplulaştırılmış değerler olarak yeterlidir; ticari amaçla
 kullanılmayacak, sonuçlar MEDAŞ kaynak gösterilerek paylaşılacaktır. Tesis adı yerine

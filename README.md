@@ -47,6 +47,7 @@ Anlatım       Pano (risk cümlesi, eğri, ısı haritası)  ·  YZ planlama not
 | `model/baglanti_etut_notu.md` | Yük ölçümü, gerilim ve koruma: ne yapıldı, ne yapılamaz, sınır nerede |
 | `model/edas_veri_talebi.md`, `bilgi_edinme_basvurusu.md`, `epdk_pilot_onerisi.md` | Veri talepleri ve pilot önerisi |
 | `model/sentetik_olcum.py` | Demo için sentetik TM yük profili — **gerçek ölçüm değildir**, manşet sayıya girmez |
+| `model/hava_onbellek.py` | Demo TM'lerinin 20 yıllık hava verisini önceden çeker; uygulama canlı API'ye bağımlı kalmaz |
 | `web/src/veri` | Open-Meteo istemcisi, TEİAŞ TM tablosu, EDAŞ ölçüm okuyucusu |
 | `web/src/sim` | PVWatts GES modeli, senaryo kurma, kısıntı, batarya, fider gerilimi |
 | `web/api/ozet.ts` | Vercel fonksiyonu: planlama notu (Gemini, Claude yedekli; anahtar sunucuda) |
@@ -60,6 +61,8 @@ cd model
 pip install pandas numpy lightgbm holidays scikit-learn
 python epias_cek.py        # EPİAŞ hesabı gerekir, .env ile
 python train.py
+
+python hava_onbellek.py     # demo TM'lerinin havasını statik dosyaya yazar
 
 pip install pandapower
 python gerilim_dogrulama.py
@@ -78,7 +81,7 @@ npm run dev       # http://localhost:5173
 
 | Katman | Kaynak | Durum |
 | --- | --- | --- |
-| Hava (eğik yüzey ışınımı, sıcaklık, rüzgâr) | Open-Meteo Historical API, ERA5, 2006–2025 (20 yıl) | Gerçek, canlı |
+| Hava (eğik yüzey ışınımı, sıcaklık, rüzgâr) | Open-Meteo Historical API, ERA5, 2006–2025 (20 yıl) | Gerçek; demo TM'leri için önceden çekilmiş, diğerleri canlı |
 | Yük şekli ve belirsizliği | EPİAŞ Şeffaflık Platformu, ulusal saatlik tüketim 2016–2025 (87.623 saat) | Gerçek |
 | TM üst sınırı, tahsisli güç | TEİAŞ TM bazlı kalan kapasite tablosu, 01.10.2026 (794 TM, 81 il) | Resmî |
 | TM konumu | OpenStreetMap `power=substation` (≥66 kV); 794 TM'nin 667'si gerçek saha konumundan | Açık veri, il sınırıyla denetlendi |
@@ -115,6 +118,14 @@ Koruma etüdü röle ayarları ve akım trafosu oranları olmadan yapılamaz; bu
 - **Ara besleme (infeed) asıl soru.** Santral arızaya kendi payını bastığı için TM rölesi arıza akımının tamamını görmez: 40 MW'ta görmediği pay %19,1. Röle ayarı buna göre gözden geçirilmezse açma süresi uzar. Esnek bağlantıda bağlanan güç statik kuraldan büyük olduğu için bu etüt önkoşuldur.
 
 Ayrıntı ve hâlâ EDAŞ'tan gereken veri listesi: `model/baglanti_etut_notu.md`.
+
+## Etkinin karşı-olgusal tabanı
+
+Emisyon hesabı "esnek bağlantı olmasaydı bu MW hiç bağlanmazdı" der. Bu bir varsayım olarak bırakılmadı; TEİAŞ'ın kendi tablosuyla sınırlandı.
+
+2024–2025'te reddedilen lisanssız güç ≈ **7.540 MW** (Ember: 11,6 GW'ın %65'i). TEİAŞ'ın 01.10.2026 tablosunda ülke genelinde kalan kapasite **625,10 MWe**. Kalan kapasitenin *tamamı* reddedilen projelere verilse bile en fazla **%8,3**'ü başka bir trafo merkezine taşınabilir; **%91,7**'sinin gidecek yeri yoktur. Uygulamadaki emisyon sayısından bu taşınma payı düşülür.
+
+Üstelik %8,3 cömert bir üst sınır: kalan kapasite 81 ile dağılmış durumda ve reddedilen projenin bulunduğu bölgede olmayabilir. Üç ilde (Ardahan, Kırıkkale, Yalova) hiçbir TM'de kapasite kalmamıştır.
 
 ## Atıf ve lisans
 

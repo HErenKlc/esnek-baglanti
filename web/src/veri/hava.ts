@@ -24,10 +24,44 @@ export interface HavaSonucu {
 
 const onbellek = new Map<string, HavaSonucu>();
 
+/**
+ * Önceden çekilmiş hava dosyasını çözer (model/hava_onbellek.py üretir).
+ * Zaman damgası saklanmaz: yıl başına 8.760 değer, yer kazanmak için tam sayıya
+ * ölçeklenmiş hâlde durur. Burada aynı ölçekle geri çevriliyor.
+ */
+function onbellekCoz(j: any): HavaSonucu {
+  const yillar: HavaYili[] = j.yillar.map((yil: number, y: number) => {
+    const poa = new Float32Array(SAAT_YIL);
+    const sicaklik = new Float32Array(SAAT_YIL);
+    const ruzgar = new Float32Array(SAAT_YIL);
+    for (let i = 0; i < SAAT_YIL; i++) {
+      poa[i] = j.poa[y][i];
+      sicaklik[i] = j.sicaklik[y][i] / 10;
+      ruzgar[i] = j.ruzgar[y][i] / 10;
+    }
+    return { yil, poa, sicaklik, ruzgar };
+  });
+  if (yillar.length < 3) throw new Error("Önbellek dosyasında yeterli tam yıl yok.");
+  return { yillar, eksikOran: j.eksikOran ?? 0, egikKaynak: j.egikKaynak === "GHI" ? "GHI" : "GTI" };
+}
+
 export async function havaGetir(enlem: number, boylam: number, egim = 30): Promise<HavaSonucu> {
   const anahtar = `${enlem.toFixed(2)},${boylam.toFixed(2)},${egim}`;
   const var_ = onbellek.get(anahtar);
   if (var_) return var_;
+
+  // Önce depoda hazır dosya var mı? Varsa canlı API'ye hiç gidilmez: demo günü
+  // Open-Meteo yavaşlasa ya da kapalı olsa bile ilk ekran açılır.
+  try {
+    const r = await fetch(`/hava/${enlem.toFixed(2)}_${boylam.toFixed(2)}_${egim}.json`);
+    if (r.ok) {
+      const sonuc = onbellekCoz(await r.json());
+      onbellek.set(anahtar, sonuc);
+      return sonuc;
+    }
+  } catch {
+    // Dosya yok ya da bozuk: canlı çekmeye devam. Sessiz geçilir, davranış değişmez.
+  }
 
   const p = new URLSearchParams({
     latitude: String(enlem),

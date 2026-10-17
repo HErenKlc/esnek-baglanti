@@ -23,6 +23,20 @@ const EF = {
 };
 const GES_YASAM_DONGUSU = 0.048; // tCO2/MWh
 
+// Karşı-olgusal taban (counterfactual): "esnek bağlantı olmasaydı bu MW hiç bağlanmazdı."
+// Bu bir varsayım olarak bırakılmıyor, TEİAŞ'ın kendi tablosuyla sınırlanıyor: reddedilen
+// gücün ancak ülkede kalan kapasite kadarı başka bir TM'ye taşınabilir. Kalan kapasitenin
+// TAMAMI reddedilenlere verilse bile taşınabilecek pay bu oranla sınırlı; gerisinin
+// gidecek yeri yok. Etkiden bu pay düşülüyor — yani sayı muhafazakâr tarafta kalıyor.
+// Ember: 2024–2025'te 11,6 GW lisanssız başvurunun %65'i kapasite gerekçesiyle reddedildi.
+const REDDEDILEN_MW = 11_600 * 0.65;
+
+/** Reddedilen gücün başka TM'ye taşınabilecek payı (0..1). Ulusal tablo yoksa 0 varsayılmaz: hesap gösterilmez. */
+function tasinabilirPay(u: Ulusal | null): number | null {
+  if (!u || !(u.toplamKalanMWe > 0)) return null;
+  return Math.min(1, u.toplamKalanMWe / REDDEDILEN_MW);
+}
+
 type EfSecim = "cm" | "bm" | "om" | "ozel";
 interface Durum {
   trafo: Trafo;
@@ -297,6 +311,9 @@ async function yenile(yeniSenaryo: boolean) {
   const co2Alt = ekMWhAlt * efNet(), co2AltMuh = ekMWhAlt * efNet(EF.bm.deger);
   // Emisyon bandı: ETKB 2023'ün üç resmî marjı. Yapı marjı = düşük, kombine = orta, işletme = yüksek.
   const co2AltDus = ekMWhAlt * efNet(EF.bm.deger), co2AltYuk = ekMWhAlt * efNet(EF.om.deger);
+  // Taşınma payı düşülmüş hâli: karşı-olgusal tabanın TEİAŞ tablosuyla sınırlanmış sürümü.
+  const tasinir = tasinabilirPay(ulusal);
+  const co2AltNet = tasinir == null ? co2Alt : co2Alt * (1 - tasinir);
   const dAlt = dagilim(altSc, girdi, Math.max(altSinir, 0.01));
   const kisintiAlt = durum.istatistik === "p90" ? dAlt.p90 : dAlt.p50;
 
@@ -343,7 +360,7 @@ async function yenile(yeniSenaryo: boolean) {
       <div class="olcum vurgu"><div class="ad">Varsayımsız alt sınır</div><div class="sayi">${tr(altSinir)}<small>MW</small></div><div class="ek">yük bilgisi kullanılmadan</div></div>
       <div class="olcum"><div class="ad">Yük bilgisiyle</div><div class="sayi">${tr(esnek)}<small>MW</small></div><div class="ek">${fiderMW() ? "hat sınırı dahil" : `yük ±%50 ile ${tr(esnekAlt)}–${tr(esnekUst)} MW`}</div></div>
       <div class="olcum"><div class="ad">Bataryayla</div><div class="sayi">${bat ? tr(esnekBat) : "–"}<small>${bat ? "MW" : ""}</small></div><div class="ek">${bat ? `${tr(bat.gucMW, 0)} MW / ${tr(bat.enerjiMWh, 0)} MWh, verim %88` : "batarya kapalı"}</div></div>
-      <div class="olcum"><div class="ad">Net önlenen emisyon</div><div class="sayi">${tr(co2Alt / 1000, 1)}<small>bin tCO₂/yıl</small></div><div class="ek">varsayımsız · ${tr(ekMWhAlt / 1000, 1)} GWh · band ${tr(co2AltDus / 1000, 1)}–${tr(co2AltYuk / 1000, 1)} bin</div></div>
+      <div class="olcum"><div class="ad">Net önlenen emisyon</div><div class="sayi">${tr(co2AltNet / 1000, 1)}<small>bin tCO₂/yıl</small></div><div class="ek">varsayımsız · ${tr(ekMWhAlt / 1000, 1)} GWh · band ${tr(co2AltDus / 1000, 1)}–${tr(co2AltYuk / 1000, 1)} bin${tasinir == null ? "" : ` · taşınma payı %${tr(tasinir * 100, 1)} düşüldü`}</div></div>
     </div>
 
     <section class="bolum">
@@ -454,6 +471,9 @@ async function yenile(yeniSenaryo: boolean) {
           <tr><td>Trafo üst sınırı ve tahsisli güç</td><td>${TRAFO_KAYNAK}</td><td><span class="etiket gercek">resmî, 01.10.2026</span></td></tr>
           <tr><td>Trafo merkezi konumu</td><td>OpenStreetMap, <code>power=substation</code> (≥66 kV). Bölgedeki ${KONUM_KAYNAK.toplam} TM'nin ${KONUM_KAYNAK.osm}'si gerçek saha konumundan, ${KONUM_KAYNAK.ilce}'i ilçe merkezinden. Ulusal tabloda ${KONUM_KAYNAK.ulusalOsm}/${KONUM_KAYNAK.ulusalToplam}. Eşleşmeler il merkezine 200 km sınırıyla denetlendi; ilk denemede il dışına düşen 48 kayıt elendi.</td><td><span class="etiket gercek">açık veri, doğrulandı</span></td></tr>
           <tr><td>Emisyon faktörü</td><td>ETKB 2023 Ulusal Elektrik Şebekesi Emisyon Faktörü Bilgi Formu (UNFCCC CDM yöntemi); GES yaşam döngüsü IPCC AR5.</td><td><span class="etiket gercek">resmî</span></td></tr>
+          <tr><td>Karşı-olgusal taban</td><td>Etki hesabı "esnek bağlantı olmasaydı bu MW hiç bağlanmazdı" der. Bu varsayım olarak bırakılmadı, TEİAŞ'ın kendi tablosuyla sınırlandı: ${ulusal
+            ? `reddedilen güç ${tr(REDDEDILEN_MW, 0)} MW (Ember: 11,6 GW'ın %65'i), ülke genelinde kalan kapasite yalnızca ${tr(ulusal.toplamKalanMWe, 1)} MWe. Kalan kapasitenin <b>tamamı</b> reddedilenlere verilse bile en fazla %${tr((tasinir ?? 0) * 100, 1)}'i başka bir TM'ye taşınabilir; <b>%${tr(100 - (tasinir ?? 0) * 100, 1)}'inin gidecek yeri yok</b>. Yukarıdaki emisyon sayısından bu taşınma payı düşüldü. Üstelik bu üst sınır cömert: kalan kapasite illere dağılmış durumda, reddedilen projenin bulunduğu bölgede olmayabilir.`
+            : "ulusal tablo yüklenemedi, taşınma payı düşülemedi."}</td><td><span class="etiket gercek">tabloyla sınırlandı</span></td></tr>
           <tr><td>GES üretimi</td><td>PVWatts modeli (pvlib-python ile birebir doğrulandı), DC/AC 1,2, kayıp %14.</td><td><span class="etiket gercek">standart model</span></td></tr>
           <tr><td>TM yük büyüklüğü</td><td>${olcum
             ? (olcum.sentetik
