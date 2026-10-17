@@ -95,6 +95,18 @@ function urlYaz() {
 
 let yk: YukKantilleri;
 let geriTest: GeriTestVerisi | null = null;
+
+/** TEİAŞ'ın iki tarihli resmî tablosunun özeti; hesap değil, fotoğraf (model/ulusal_ozet.py). */
+interface Ulusal {
+  tarih: string; oncekiTarih: string; kaynak: string;
+  tmSayisi: number; ilSayisi: number; toplamKalanMWe: number; doluTM: number;
+  oncekiToplamMWe: number; oncekiDoluTM: number; oncekiTMSayisi: number;
+  azalanTM: number; artanTM: number; degisimMWe: number; degisimYuzde: number;
+  tamamenDoluIl: string[];
+  iller: { il: string; tm: number; dolu: number; kalan: number; doluOran: number }[];
+}
+let ulusal: Ulusal | null = null;
+const trTarih = (g: string) => g.split("-").reverse().join(".");
 const geriYillari = () => Object.keys(geriTest?.yillar ?? {}).map(Number).sort((a, b) => a - b);
 let rapor: any;
 let hava: HavaSonucu | null = null;
@@ -389,6 +401,8 @@ async function yenile(yeniSenaryo: boolean) {
       <div id="bolge"></div>
     </section>
 
+    ${ulusalBolum()}
+
     <section class="bolum">
       <h2>Bugün kim kullanır: mevzuat beklemeden</h2>
       <p>Türkiye'de trafo merkezi düzeyinde esnek bağlantı henüz tanımlı değil. Ama aynı ilke santral düzeyinde mevzuatta zaten var:
@@ -532,6 +546,37 @@ function modelTablosu() {
     <p class="kucuk">Basit yöntemi geçemeseydi karmaşık modeli kullanmayacaktık. LightGBM tek başına bandı dar tutuyor (kapsama ${yuzde(rapor.sonuclar[2].P5_P95_kapsama)}); conformal kalibrasyon bunu düzeltiyor.</p>`;
 }
 
+/** Türkiye tablosu: TEİAŞ'ın iki resmî tablosunun karşılaştırması. Simülasyon içermez. */
+function ulusalBolum(): string {
+  const u = ulusal;
+  if (!u) return "";
+  const dolu = (a: number, b: number) => `${tr(100 * a / b, 0)}`;
+  const ilk = u.iller.filter((x) => x.tm >= 3).slice(0, 10);
+  return `
+    <section class="bolum">
+      <h2>Türkiye tablosu: ${u.tmSayisi} trafo merkezi, ${u.ilSayisi} il</h2>
+      <p>Bu bölümde simülasyon yok. TEİAŞ'ın iki ayrı tarihte yayımladığı resmî tablonun karşılaştırması;
+        problemin ulusal büyüklüğünü ve <b>ne hızla büyüdüğünü</b> gösterir.</p>
+      <div class="olcumler">
+        <div class="olcum"><div class="ad">Kalan kapasite</div><div class="sayi">${tr(u.toplamKalanMWe, 1)}<small>MWe</small></div><div class="ek">${trTarih(u.tarih)} itibarıyla</div></div>
+        <div class="olcum vurgu"><div class="ad">Tamamen dolu TM</div><div class="sayi">${u.doluTM}<small>/ ${u.tmSayisi}</small></div><div class="ek">%${dolu(u.doluTM, u.tmSayisi)}'i yeni GES alamıyor</div></div>
+        <div class="olcum"><div class="ad">${trTarih(u.oncekiTarih)}'dan beri</div><div class="sayi">${tr(u.degisimMWe, 1)}<small>MWe</small></div><div class="ek">%${tr(Math.abs(u.degisimYuzde), 1)} azaldı</div></div>
+        <div class="olcum"><div class="ad">Kapasitesi azalan TM</div><div class="sayi">${u.azalanTM}<small>TM</small></div><div class="ek">artan: ${u.artanTM}</div></div>
+        <div class="olcum"><div class="ad">Tamamen dolu il</div><div class="sayi">${u.tamamenDoluIl.length}<small>il</small></div><div class="ek">${u.tamamenDoluIl.join(", ") || "–"}</div></div>
+      </div>
+      <p class="kucuk">İki tablo arasında ${u.oncekiTMSayisi} → ${u.tmSayisi} trafo merkezi listelendi; dolu TM sayısı
+        ${u.oncekiDoluTM}'den ${u.doluTM}'e çıktı. TEİAŞ'ın notu: listede olmayan merkezlerde yönetmeliğin verdiği
+        2 MW dışında talep gelmemiş, talep geldikçe ekleniyorlar. Yani bu tablo "yatırımcının kapı çaldığı her TM" demek.</p>
+      <table class="veri">
+        <thead><tr><th>En dolu iller (3+ TM)</th><th style="text-align:right">Dolu / toplam TM</th><th style="text-align:right">Kalan kapasite</th></tr></thead>
+        <tbody>${ilk.map((x) => `<tr><td>${x.il}</td><td class="r">${x.dolu} / ${x.tm}</td>
+          <td class="r">${tr(x.kalan, 2)} MWe</td></tr>`).join("")}</tbody>
+      </table>
+      <p class="kucuk">Kaynak: ${u.kaynak}. Tablolar <code>model/pdf_tablo.py</code> ile okundu; üretilen toplam
+        TEİAŞ'ın duyurduğu rakamla birebir doğrulandı.</p>
+    </section>`;
+}
+
 async function ozetIste() {
   const kutu = document.getElementById("gemini")!;
   const btn = document.getElementById("ozetBtn") as HTMLButtonElement;
@@ -559,6 +604,8 @@ document.getElementById("paylas")!.addEventListener("click", async (e) => {
 
 async function basla() {
   const geriYukle = fetch("/geri_test.json").then((r) => r.json());
+  fetch("/ulusal.json").then((r) => r.json()).then((u) => { ulusal = u; yenile(false); })
+    .catch(() => undefined); // ulusal tablo isteğe bağlı: gelmezse bölüm gizlenir
   const [a, b] = await Promise.all([fetch("/yuk_kantilleri_2026.json"), fetch("/model_raporu.json")]);
   yk = await a.json();
   rapor = await b.json();
