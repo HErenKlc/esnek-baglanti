@@ -18,6 +18,8 @@ Ana sayı varsayıma dayanmaz. Üç basamak var, hangisinde olduğunuz arayüzde
 2. **Yük şekliyle aralık.** Ulusal saatlik tüketim şekli TM tepesine ölçeklenir; sonuç tek sayı değil, %30–90 tepe aralığı.
 3. **EDAŞ SCADA ölçümüyle tek sayı.** 8.760 satırlık saatlik ölçüm dosyası yüklenince varsayım tamamen kalkar (`web/src/veri/olcum.ts`, biçim örneği `model/ornek_olcum_BICIM.csv`).
 
+Üçüncü basamak gerçek veri gelmeden gösterilemediği için, demoda kullanılmak üzere sentetik bir profil var: `model/ornek_olcum_SENTETIK_konya.csv` (üreteci `model/sentetik_olcum.py`). Dosya her satırında kendini işaretler; okuyucu bunu yakalar ve arayüz onu **gerçek ölçüm diye göstermez** — "SENTETİK, iddia değil" etiketiyle gösterir. Manşet sayı bu dosyadan etkilenmez. Yağmur Hanım'ın Build & Show kuralı: sentetik veri boru hattını doğrular, doğruluk iddiası taşımaz.
+
 ## Mimari
 
 ```
@@ -44,6 +46,7 @@ Anlatım       Pano (risk cümlesi, eğri, ısı haritası)  ·  YZ planlama not
 | `model/kisa_devre.py` | Eviricili GES'in arıza akımına katkısı ve rölenin gördüğü akıma etkisi (IEC 60909) |
 | `model/baglanti_etut_notu.md` | Yük ölçümü, gerilim ve koruma: ne yapıldı, ne yapılamaz, sınır nerede |
 | `model/edas_veri_talebi.md`, `bilgi_edinme_basvurusu.md`, `epdk_pilot_onerisi.md` | Veri talepleri ve pilot önerisi |
+| `model/sentetik_olcum.py` | Demo için sentetik TM yük profili — **gerçek ölçüm değildir**, manşet sayıya girmez |
 | `web/src/veri` | Open-Meteo istemcisi, TEİAŞ TM tablosu, EDAŞ ölçüm okuyucusu |
 | `web/src/sim` | PVWatts GES modeli, senaryo kurma, kısıntı, batarya, fider gerilimi |
 | `web/api/ozet.ts` | Vercel fonksiyonu: planlama notu (Gemini, Claude yedekli; anahtar sunucuda) |

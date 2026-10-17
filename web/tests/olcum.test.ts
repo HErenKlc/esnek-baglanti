@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { olcumAyristir } from "../src/veri/olcum";
 // Gerçekçi bir TM yük profili üret: gece 12 MW, gündüz 30 MW, yazın daha yüksek.
 const satir: string[] = ["tarih;MW"];
@@ -45,4 +46,13 @@ console.log(`ters akış sınırı: ${sc.ihracatLimitiMW.toFixed(1)} MW ` +
             `(72 − en düşük gündüz yükü ${sc.enDusukGunduzYukMW.toFixed(1)})`);
 console.log("yük dizisi ölçümün kendisi mi:", sc.yuk[0] === r.deger ? "evet" : "HAYIR");
 void pvSaatlik;
+// Sentetik dosya kendini ele vermeli: arayüz bunu "gerçek ölçüm" diye göstermemeli.
+const sentetikMetin = readFileSync(new URL("../../model/ornek_olcum_SENTETIK_konya.csv", import.meta.url), "utf8");
+const rs = olcumAyristir(sentetikMetin);
+console.log(`sentetik dosya: ${rs.satir} saat, tepe ${rs.tepeMW.toFixed(1)} MW, sentetik bayrağı: ${rs.sentetik}`);
+if (!rs.sentetik) throw new Error("Sentetik dosya işaretlenmedi — arayüz onu gerçek ölçüm sanar");
+if (rs.satir !== 8760) throw new Error("Sentetik dosya 8.760 saat olmalı");
+// Gerçek biçimli (işaretsiz) dosya sentetik sayılmamalı
+if (r.sentetik) throw new Error("İşaretsiz dosya yanlışlıkla sentetik sayıldı");
+
 console.log("TAMAM");

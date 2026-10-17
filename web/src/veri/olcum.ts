@@ -17,6 +17,8 @@ export interface OlcumSonucu {
   tepeMW: number;
   enDusukGunduzMW: number;
   uyari?: string;
+  /** Dosya kendini sentetik ilan ediyor mu? Arayüz bunu gerçek ölçüm gibi göstermemeli. */
+  sentetik: boolean;
 }
 
 const SAAT_YIL = 8760;
@@ -30,6 +32,9 @@ function sayiyaCevir(h: string): number {
 }
 
 export function olcumAyristir(metin: string): OlcumSonucu {
+  // Demo için üretilen sentetik profiller kendilerini işaretler (model/sentetik_olcum.py).
+  // Bunu burada yakalayıp yukarı taşıyoruz: arayüz sentetik veriyi "gerçek ölçüm" diye göstermemeli.
+  const sentetik = /SENTET[İI]K|SENTHETIC|SYNTHETIC/i.test(metin.slice(0, 4000));
   const satirlar = metin.split(/\r?\n/).filter((x) => x.trim() !== "");
   if (satirlar.length < 100) throw new Error("Dosyada yeterli satır yok (en az bir yıllık saatlik veri bekleniyor).");
 
@@ -87,5 +92,9 @@ export function olcumAyristir(metin: string): OlcumSonucu {
     uyari = (uyari ? uyari + " " : "") +
       `Tepe değer ${tepe.toFixed(0)}: birim kW olabilir, MW bekleniyor.`;
   }
-  return { deger, satir: degerler.length, tepeMW: tepe, enDusukGunduzMW: enDusukGunduz, uyari };
+  if (sentetik) {
+    uyari = (uyari ? uyari + " " : "") +
+      "Dosya kendini SENTETİK olarak işaretliyor: bu gerçek ölçüm değildir, yalnızca demo içindir.";
+  }
+  return { deger, satir: degerler.length, tepeMW: tepe, enDusukGunduzMW: enDusukGunduz, uyari, sentetik };
 }
