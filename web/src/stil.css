@@ -84,11 +84,11 @@ button, input, select { font: inherit; color: inherit; }
 .cevap b { font-family: var(--rakam); font-weight: 600; font-size: 1.12em; }
 .cevap-alt { color: var(--murekkep-2); margin: 0 0 22px; max-width: 70ch; }
 
-.olcumler { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-top: 2px solid var(--murekkep); border-bottom: 1px solid var(--cizgi); margin-bottom: 28px; }
+.olcumler { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border-top: 2px solid var(--murekkep); border-bottom: 1px solid var(--cizgi); margin-bottom: 28px; }
 .olcum { padding: 12px 14px 14px 0; }
 .olcum + .olcum { padding-left: 14px; border-left: 1px solid var(--cizgi); }
 .olcum .ad { font-size: 0.85rem; color: var(--murekkep-2); }
-.olcum .sayi { font-family: var(--rakam); font-size: 2.1rem; font-weight: 600; line-height: 1.1; }
+.olcum .sayi { font-family: var(--rakam); font-size: 1.95rem; font-weight: 600; line-height: 1.1; }
 .olcum .sayi small { font-size: 1rem; font-weight: 500; margin-left: 3px; }
 .olcum .ek { font-size: 0.82rem; color: var(--murekkep-2); }
 .olcum.vurgu .sayi { color: var(--uygun); }
@@ -130,7 +130,7 @@ table.veri td.r { font-family: var(--rakam); font-size: 1rem; text-align: right;
   .sol { border-right: 0; border-bottom: 1px solid var(--cizgi); }
   .ana { padding: 20px 16px 48px; }
   .olcumler { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .olcum:nth-child(3) { padding-left: 0; border-left: 0; }
+  .olcum:nth-child(odd) { padding-left: 0; border-left: 0; }
   .iki { grid-template-columns: 1fr; }
   .ust { padding: 12px 16px; }
 }

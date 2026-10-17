@@ -269,6 +269,11 @@ async function yenile(yeniSenaryo: boolean) {
   const d = dagilim(s, girdi, Math.max(esnek, 0.01), undefined, isi);
   const ekMWh = ekEnerji(s, girdi, esnek, statik);
   const co2 = ekMWh * efNet(), co2Muh = ekMWh * efNet(EF.bm.deger);
+  // Varsayımsız etki: yalnızca alt sınırın (yük bilgisi kullanmayan) getirdiği ek enerji.
+  const ekMWhAlt = ekEnerji(altSc, girdi, altSinir, statik);
+  const co2Alt = ekMWhAlt * efNet(), co2AltMuh = ekMWhAlt * efNet(EF.bm.deger);
+  const dAlt = dagilim(altSc, girdi, Math.max(altSinir, 0.01));
+  const kisintiAlt = durum.istatistik === "p90" ? dAlt.p90 : dAlt.p50;
 
   // Geri test: model test yılını görmeden boyutlandırır; o yılın gerçek havası + gerçek EPİAŞ yükü ile gerçekleşen kısıntı
   const geri = geriTest ? geriYillari().map((y) => geriTestYili(hava!.yillar, geriTest!, y, girdi, durum.hedef, durum.istatistik))
@@ -302,15 +307,18 @@ async function yenile(yeniSenaryo: boolean) {
   const fs1 = fg ? fiderKapasitesi(fiderGirdisi(1)!) : null;
 
   ana.innerHTML = `
-    <p class="cevap">${t.ad}: statik kurala göre ${dolu ? "<b>dolu</b>" : `<b>${tr(statik)} MW</b> boş`}. Esnek bağlantıyla
-      <b>${tr(esnek)} MW</b> bağlanabilir, ${dolu ? "hepsi" : `statik sınırın <b>${tr(esnek - statik)} MW</b>`} üzerinde. Bedeli: ${istAd} yeni projelerin üretiminde <b>${yuzde(kisinti)}</b> kısıntı.</p>
-    <p class="cevap-alt">Statik kural en kötü anı varsayar: santraller tam güçteyken trafodaki yük en düşüktür. Gerçek hava ve yük birlikte simüle edilince
-      bu an yılda birkaç saat sürüyor. O saatlerde yeni proje kısılır, mevcut santrallerin hakkı korunur.</p>
+    <p class="cevap">${t.ad}: statik kurala göre ${dolu ? "<b>dolu</b>" : `<b>${tr(statik)} MW</b> boş`}. Trafodaki yük hakkında
+      <b>hiçbir varsayım yapmadan</b> bile esnek bağlantı <b>${tr(altSinir)} MW</b> açıyor${dolu ? "" : `, statik sınırın <b>${tr(altSinir - statik)} MW</b> üzerinde`}.
+      Bedeli: ${istAd} yeni projelerin üretiminde <b>${yuzde(kisintiAlt)}</b> kısıntı.</p>
+    <p class="cevap-alt">Bu sayı yalnızca iki şeye dayanır: TEİAŞ'ın bu TM için yayımladığı ${tr(t.maksMW)} MW üst sınırı ve bu koordinatın 20 yıllık gerçek hava verisi.
+      Yük en düşük kabul edilir, yani statik kuralın kendi en kötü varsayımı korunur. Kazanç tamamen şundan gelir: GES yılın çok az saatinde tam güçte üretir.
+      TM yükü bilinirse sayı <b>${tr(esnek)} MW</b>'a çıkar; aşağıdaki merdiven bunu ayrı basamakta gösterir.</p>
     <div class="olcumler">
       <div class="olcum"><div class="ad">Statik kurala göre boş</div><div class="sayi">${tr(statik)}<small>MW</small></div><div class="ek">${tr(t.tahsisMW)} / ${tr(t.maksMW)} MW tahsisli</div></div>
-      <div class="olcum vurgu"><div class="ad">Esnek bağlantıyla</div><div class="sayi">${tr(esnek)}<small>MW</small></div><div class="ek">${fiderMW() ? "hat sınırı dahil" : `yük ±%50 ile ${tr(esnekAlt)}–${tr(esnekUst)} MW`}</div></div>
+      <div class="olcum vurgu"><div class="ad">Varsayımsız alt sınır</div><div class="sayi">${tr(altSinir)}<small>MW</small></div><div class="ek">yük bilgisi kullanılmadan</div></div>
+      <div class="olcum"><div class="ad">Yük bilgisiyle</div><div class="sayi">${tr(esnek)}<small>MW</small></div><div class="ek">${fiderMW() ? "hat sınırı dahil" : `yük ±%50 ile ${tr(esnekAlt)}–${tr(esnekUst)} MW`}</div></div>
       <div class="olcum"><div class="ad">Bataryayla</div><div class="sayi">${bat ? tr(esnekBat) : "–"}<small>${bat ? "MW" : ""}</small></div><div class="ek">${bat ? `${tr(bat.gucMW, 0)} MW / ${tr(bat.enerjiMWh, 0)} MWh, verim %88` : "batarya kapalı"}</div></div>
-      <div class="olcum"><div class="ad">Net önlenen emisyon</div><div class="sayi">${tr(co2 / 1000, 1)}<small>bin tCO₂/yıl</small></div><div class="ek">muhafazakâr: ${tr(co2Muh / 1000, 1)} bin · ${tr(ekMWh / 1000, 1)} GWh ek enerji</div></div>
+      <div class="olcum"><div class="ad">Net önlenen emisyon</div><div class="sayi">${tr(co2Alt / 1000, 1)}<small>bin tCO₂/yıl</small></div><div class="ek">varsayımsız · ${tr(ekMWhAlt / 1000, 1)} GWh · muhafazakâr ${tr(co2AltMuh / 1000, 1)} bin</div></div>
     </div>
 
     <section class="bolum">
@@ -417,7 +425,7 @@ async function yenile(yeniSenaryo: boolean) {
           <tr><td>Trafo üst sınırı ve tahsisli güç</td><td>${TRAFO_KAYNAK}</td><td><span class="etiket gercek">gerçek, tarihi belirsiz</span></td></tr>
           <tr><td>Emisyon faktörü</td><td>ETKB 2023 Ulusal Elektrik Şebekesi Emisyon Faktörü Bilgi Formu (UNFCCC CDM yöntemi); GES yaşam döngüsü IPCC AR5.</td><td><span class="etiket gercek">resmî</span></td></tr>
           <tr><td>GES üretimi</td><td>PVWatts modeli (pvlib-python ile birebir doğrulandı), DC/AC 1,2, kayıp %14.</td><td><span class="etiket gercek">standart model</span></td></tr>
-          <tr><td>TM yük büyüklüğü</td><td>Ulusal şekil ${tr(durum.yukTepeMW)} MW tepeye ölçeklendi. Planlama en düşük gündüz yükü ${tr(s.enDusukGunduzYukMW, 1)} MW, ters akış sınırı ${tr(s.ihracatLimitiMW, 1)} MW. Merdivenin ilk basamağı bu varsayımı kullanmaz.</td><td><span class="etiket varsayim">varsayım</span></td></tr>
+          <tr><td>TM yük büyüklüğü</td><td><b>Ana sayı (${tr(altSinir)} MW) bu satırı hiç kullanmaz.</b> Yalnızca "yük bilgisiyle" üst senaryosunda devreye girer: ulusal şekil ${tr(durum.yukTepeMW)} MW tepeye ölçeklenir, en düşük gündüz yükü ${tr(s.enDusukGunduzYukMW, 1)} MW, ters akış sınırı ${tr(s.ihracatLimitiMW, 1)} MW. TM bazında gerçek yük Türkiye'de yayımlanmıyor (TEİAŞ YTBS topluyor, yayımlamıyor); EDAŞ'ın SCADA ölçümü girilince bu satır kalkar.</td><td><span class="etiket varsayim">yalnızca üst senaryoda</span></td></tr>
           <tr><td>Tahsisli güç tamamen GES</td><td>Tablo GES+RES toplamı veriyor; Konya-Karaman'da büyük çoğunluk GES.</td><td><span class="etiket varsayim">varsayım</span></td></tr>
           <tr><td>Bağlantı hattı gerilimi</td><td>${fider ? `${tr(fider, 1)} MW sınır uygulanıyor (kısa hat formülü, katalog iletken verisi).` : "Hat kontrolü kapalı."} Ayrıntılı yük akışı (pandapower) bağlantı etüdünün işi.</td><td><span class="etiket ${fider ? "gercek" : "sentetik"}">${fider ? "mühendislik hesabı" : "kapalı"}</span></td></tr>
           <tr><td>N-1, koruma, kısa devre</td><td>Bağlantı etüdünün konusu; bu araç kapasite ve kısıntı sorusunu cevaplar.</td><td><span class="etiket sentetik">kapsam dışı</span></td></tr>
@@ -533,7 +541,9 @@ async function ozetIste() {
     const j = await r.json();
     if (!r.ok) throw new Error(j.hata || r.statusText);
     kutu.innerHTML = j.metin.split(/\n+/).filter(Boolean).map((p: string) => `<p>${p.replace(/</g, "&lt;")}</p>`).join("") +
-      `<p class="kaynak">${j.kaynak === "gemini" ? `Gemini (${j.model}) yazdı; sayılar simülasyondan.` : "Şablon metin (Gemini anahtarı tanımlı değil)."}</p>`;
+      `<p class="kaynak">${j.kaynak === "sablon"
+        ? `Şablon metin${j.uyari ? ` (${String(j.uyari).replace(/</g, "&lt;")})` : ""}.`
+        : `${j.kaynak === "claude" ? "Claude" : "Gemini"} (${j.model}) yazdı; sayılar simülasyondan.`}</p>`;
   } catch (e) {
     kutu.innerHTML = `<p>Not oluşturulamadı: ${(e as Error).message}</p><button class="dugme" id="ozetBtn">Tekrar dene</button>`;
     document.getElementById("ozetBtn")!.addEventListener("click", ozetIste);
