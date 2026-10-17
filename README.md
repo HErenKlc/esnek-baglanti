@@ -2,9 +2,21 @@
 
 **"Kapasite yok" denen trafo merkezine, kısıntı riskini bilerek ne kadar temiz enerji bağlanabilir?**
 
-Climathon 2026 (Siemens × YGA × UP School) · Görev 3 prototipi · Hüseyin Eren Kılıç
+Climathon 2026 (Siemens × YGA × UP School) · Görev 3 · Hüseyin Eren Kılıç
+
+Canlı araç: **[esnek-baglanti.vercel.app](https://esnek-baglanti.vercel.app)**
 
 Türkiye'de 2024–2025'te 11,6 GW lisanssız GES/RES başvurusunun %65'i kapasite yok denerek reddedildi ([Ember](https://ember-energy.org/latest-insights/turkiye-can-bypass-grid-constraints-with-hybrid-solar-power-plants/grid-connection-capacity-challenges-in-turkiye-and/)). Kapasite, en kötü iki anın (tam üretim + en düşük yük) aynı anda olacağını varsayan statik bir kuralla hesaplanıyor. Bu araç, bir trafo merkezi için gerçek hava ve yük belirsizliğini saat saat simüle ederek esnek (kısılabilir) bağlantıyla kaç MW daha bağlanabileceğini ve bunun yıllık kısıntı bedelini (P50/P90) hesaplar.
+
+TEİAŞ'ın 01.10.2026 tarihli tablosunda 794 trafo merkezinin **346'sında (%43,6) kalan kapasite sıfır**; ülke genelindeki kalan kapasite 2,5 ayda 833,59 MWe'den 625,10 MWe'ye, yani %25 düştü.
+
+## Kanıt merdiveni
+
+Ana sayı varsayıma dayanmaz. Üç basamak var, hangisinde olduğunuz arayüzde yazılı:
+
+1. **Yük bağımsız alt sınır (varsayılan).** Trafoda hiç tüketici yokmuş gibi; tek kural "toplam üretim TEİAŞ'ın yayımladığı üst sınırı aşmasın". Yük eklenince kapasite azalmıyor, artıyor — yani bu sayı güvenli tarafta.
+2. **Yük şekliyle aralık.** Ulusal saatlik tüketim şekli TM tepesine ölçeklenir; sonuç tek sayı değil, %30–90 tepe aralığı.
+3. **EDAŞ SCADA ölçümüyle tek sayı.** 8.760 satırlık saatlik ölçüm dosyası yüklenince varsayım tamamen kalkar (`web/src/veri/olcum.ts`, biçim örneği `model/ornek_olcum_BICIM.csv`).
 
 ## Mimari
 
@@ -18,56 +30,79 @@ Simülasyon          110 senaryo × 8.760 saat, esnek kısıntı kuralı, batary
                               │
 Karar               Kabul edilen kısıntıyı aşmayan en yüksek ek MW (ikiye bölme)
                               │
-Anlatım       Pano (risk cümlesi, eğri, ısı haritası)  ·  Gemini planlama notu
+Anlatım       Pano (risk cümlesi, eğri, ısı haritası)  ·  YZ planlama notu
 ```
 
 | Klasör | İçerik |
 | --- | --- |
-| `model/` | `train.py`: EPİAŞ verisiyle yük kantil modeli, baseline kıyası, 2026 kantil çıktısı |
-| `web/src/veri` | Open-Meteo istemcisi, TEİAŞ TM tablosu |
-| `web/src/sim` | PVWatts GES modeli, senaryo kurma, kısıntı, batarya, ikiye bölme |
-| `web/src/ui` | Bağımlılıksız SVG grafikler |
-| `web/api/ozet.ts` | Vercel fonksiyonu: Gemini planlama notu (anahtar sunucuda) |
-| `web/tests` | pvlib karşılaştırması ve simülasyon testleri |
+| `model/train.py` | EPİAŞ verisiyle yük kantil modeli, baseline kıyası, 2026 kantil çıktısı |
+| `model/epias_cek.py` | EPİAŞ Şeffaflık'tan 2016–2025 saatlik tüketim |
+| `model/pdf_tablo.py`, `trafo_birlestir.py` | TEİAŞ kapasite PDF'lerinin ayrıştırılması ve birleştirilmesi |
+| `model/osm_konum.py` | TM'lerin OpenStreetMap'teki gerçek saha konumlarıyla eşleştirilmesi |
+| `model/gerilim_dogrulama.py` | Kısa hat gerilim formülünün pandapower yük akışıyla doğrulanması |
+| `model/edas_veri_talebi.md`, `bilgi_edinme_basvurusu.md`, `epdk_pilot_onerisi.md` | Veri talepleri ve pilot önerisi |
+| `web/src/veri` | Open-Meteo istemcisi, TEİAŞ TM tablosu, EDAŞ ölçüm okuyucusu |
+| `web/src/sim` | PVWatts GES modeli, senaryo kurma, kısıntı, batarya, fider gerilimi |
+| `web/api/ozet.ts` | Vercel fonksiyonu: planlama notu (Gemini, Claude yedekli; anahtar sunucuda) |
+| `web/tests` | pvlib karşılaştırması, simülasyon, ölçüm okuyucusu ve fider testleri |
 
 ## Çalıştırma
 
 ```bash
 # Model (isteğe bağlı; çıktıları web/public'te hazır)
-cd model && pip install pandas numpy lightgbm holidays && python train.py
+cd model
+pip install pandas numpy lightgbm holidays scikit-learn
+python epias_cek.py        # EPİAŞ hesabı gerekir, .env ile
+python train.py
+
+pip install pandapower
+python gerilim_dogrulama.py
 
 # Web
 cd web && npm install
-npm test          # PVWatts = pvlib, simülasyon tutarlılık testleri
+npm test          # pvlib karşılaştırması, simülasyon, ölçüm okuyucusu, fider doğrulaması
 npm run dev       # http://localhost:5173
 ```
 
-**Vercel:** Add New → Project → bu depo → Root Directory `web` → Deploy. İsteğe bağlı ortam değişkenleri: `GEMINI_API_KEY` (Google AI Studio), `GEMINI_MODEL` (varsayılan `gemini-3.8-flash`). Anahtar yoksa planlama notu şablon metinle üretilir.
+**Vercel:** Add New → Project → bu depo → Root Directory `web` → Deploy. İsteğe bağlı ortam değişkenleri: `GEMINI_API_KEY`, `GEMINI_MODEL` (varsayılan `gemini-3.8-flash`), `ANTHROPIC_API_KEY`, `SAGLAYICI=claude`. Anahtar yoksa planlama notu şablon metinle üretilir.
 
 ## Hangi kısım gerçek
 
 | Katman | Kaynak | Durum |
 | --- | --- | --- |
-| Hava (eğik yüzey ışınımı, sıcaklık, rüzgâr) | Open-Meteo Historical API, ERA5, 2015–2025 | Gerçek, canlı |
-| Yük şekli ve belirsizliği | EPİAŞ Şeffaflık Platformu, ulusal saatlik tüketim 2022–2025 | Gerçek |
-| TM üst sınırı, tahsisli güç | TEİAŞ lisanssız GES-RES kapasite tablosu (Depar Solar aktarımı; tarih kaynakta yok) | Gerçek |
-| TM yük büyüklüğü | Ulusal şeklin kullanıcı tepe değerine ölçeklenmesi | Varsayım |
-| Gerilim, N-1, koruma | — | Kapsam dışı |
+| Hava (eğik yüzey ışınımı, sıcaklık, rüzgâr) | Open-Meteo Historical API, ERA5, 2006–2025 (20 yıl) | Gerçek, canlı |
+| Yük şekli ve belirsizliği | EPİAŞ Şeffaflık Platformu, ulusal saatlik tüketim 2016–2025 (87.623 saat) | Gerçek |
+| TM üst sınırı, tahsisli güç | TEİAŞ TM bazlı kalan kapasite tablosu, 01.10.2026 (794 TM, 81 il) | Resmî |
+| TM konumu | OpenStreetMap `power=substation` (≥66 kV); 794 TM'nin 667'si gerçek saha konumundan | Açık veri, il sınırıyla denetlendi |
+| Emisyon faktörü | ETKB 2023 şebeke emisyon faktörü; GES yaşam döngüsü IPCC AR5 | Resmî, alt/üst senaryolu |
+| Bağlantı hattı gerilimi | Kısa hat formülü, pandapower ile doğrulandı | Mühendislik hesabı, isteğe bağlı |
+| TM saatlik yükü | Yayımlanmıyor; ölçüm yüklenebilir | Ana sayı bu veriyi kullanmaz |
+| N-1, koruma, kısa devre | — | Bilerek kapsam dışı |
 
 ## Yük modeli: 2025 test yılı (eğitimde görülmedi)
+
+Bölünme kronolojik: 2016–2023 eğitim, 2024 kalibrasyon, 2025 test (8.760 saat).
 
 | Yöntem | Pinball kaybı | P5–P95 kapsama | P50 MAPE |
 | --- | --- | --- | --- |
 | Naif: geçen yılın aynı saati | – | – | %5,28 |
-| Ay × saat × gün tipi kantil tablosu | 0,0123 | %83,4 | %4,18 |
-| LightGBM kantil | 0,0119 | %67,1 | %3,89 |
-| **LightGBM kantil + conformal** | **0,0111** | **%92,6** | **%3,89** |
+| Ay × saat × gün tipi kantil tablosu | 0,01264 | %87,4 | %4,44 |
+| LightGBM kantil | 0,00965 | %83,7 | %3,23 |
+| **LightGBM kantil + conformal** | **0,00962** | **%93,3** | **%3,23** |
+
+Geri test 8 yıl: her yıl, kendisini hiç görmemiş bir modelle sınandı. Yedi yılda P5–P95 kapsaması ortalama %89,8 (hedef %90). Tek istisna **2020: %62,9** — model o yılı tahmin ederken yalnızca 2016–2018 ile eğitilmişti ve COVID kapanmalarındaki yük çöküşünü hiçbir geçmiş veri haber vermiyordu. P90 bandı normal iklim ve talep değişkenliğinin kötü ucunu tanımlar, yapısal bir kriz senaryosunu değil.
+
+## Gerilim formülünün doğrulanması
+
+`web/src/sim/fider.ts` içindeki kısa hat formülü (ΔU ≈ L·(R·P − X·Q)/U²), pandapower Newton-Raphson yük akışına karşı 150 durumda sınandı (3 iletken × 5 mesafe × 2 cosφ × 6 güç seviyesi). Sonuç: **25 kapasite durumunun hiçbirinde formül gerçek kapasiteden büyük bir sayı vermiyor**; çalışma aralığında en iyimser gerilim sapması 0,02 puan. cosφ<1'de sapma büyüyor, çünkü R·P ile X·Q birbirini götürünce ihmal edilen ikinci dereceden terim göreli olarak büyüyor — yönü yine muhafazakâr. Üretici: `model/gerilim_dogrulama.py` → `web/public/gerilim_dogrulama.json`.
 
 ## Atıf ve lisans
 
 - Hava: [Open-Meteo](https://open-meteo.com) (CC BY 4.0), ERA5 — Copernicus Climate Change Service bilgisi kullanılmıştır.
-- Yük: [EPİAŞ Şeffaflık Platformu](https://seffaflik.epias.com.tr); derleme: [ulvi12/Turkiye-Electricity-Prediction](https://github.com/ulvi12/Turkiye-Electricity-Prediction).
-- TM kapasiteleri: TEİAŞ, [Depar Solar aktarımı](https://www.deparsolar.com/teias-lisanssiz-ges-res-trafo-kapasiteleri-tahsis-edilen_4-223).
+- Yük: [EPİAŞ Şeffaflık Platformu](https://seffaflik.epias.com.tr), [eptr2](https://pypi.org/project/eptr2/) ile çekildi.
+- TM kapasiteleri: TEİAŞ, "2026 Yılı İçin Dağıtım Seviyesinden Transformatör Merkezi Bazlı Tahsis Edilen Güneş ve Rüzgar Kaynaklı Kalan Lisanssız Üretim Kapasiteleri", [teias.gov.tr/duyurular](https://www.teias.gov.tr/duyurular).
+- TM konumları: [OpenStreetMap](https://www.openstreetmap.org) katkıcıları (ODbL), Overpass API.
 - GES modeli: [pvlib-python](https://github.com/pvlib/pvlib-python) PVWatts ve Faiman modellerinin TypeScript uyarlaması.
+- Yük akışı: [pandapower](https://pandapower.org).
 
 Bu bir prototiptir. Gerçek bağlantı kararı için EDAŞ yük ölçümü, gerilim ve koruma etütleri gerekir.
