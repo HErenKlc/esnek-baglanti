@@ -99,8 +99,23 @@ def kaynak(etiket: dict) -> str:
     return "bilinmiyor"
 
 
-def cek() -> list:
-    veri = urllib.parse.urlencode({"data": SORGU}).encode()
+# Alan sorgusunun gerçekten tuttuğunu sınayan ön sorgu. Bu olmadan, ad eşleşmesi
+# tutmazsa Overpass HATA VERMEZ — sıfır sonuç döner ve betik bunu "bölgede hiç
+# tesis yok" diye raporlar. Aradığımız cevap zaten "rüzgâr az" olduğu için böyle
+# bir sahte sıfır fark edilmeden kanıt diye kullanılabilirdi. Bir kanıt üretmek
+# için yazılmış betiğin yapabileceği en kötü hata bu; o yüzden önce alanı doğruluyoruz.
+ALAN_SORGUSU = """
+[out:json][timeout:60];
+(
+  area["name"="Konya"]["admin_level"="4"];
+  area["name"="Karaman"]["admin_level"="4"];
+);
+out ids;
+"""
+
+
+def sor(sorgu: str, ne: str) -> list:
+    veri = urllib.parse.urlencode({"data": sorgu}).encode()
     istek = urllib.request.Request(OVERPASS, data=veri,
                                    headers={"User-Agent": "esnek-baglanti/1.0 (akademik calisma)"})
     for deneme in range(3):
@@ -109,9 +124,22 @@ def cek() -> list:
                 return json.loads(r.read().decode("utf-8"))["elements"]
         except Exception as e:
             bekle = 30 * (deneme + 1)
-            print(f"  Overpass hatası: {e} — {bekle} sn sonra tekrar", file=sys.stderr)
+            print(f"  Overpass hatası ({ne}): {e} — {bekle} sn sonra tekrar", file=sys.stderr)
             time.sleep(bekle)
-    raise SystemExit("Overpass'tan veri alınamadı.")
+    raise SystemExit(f"Overpass'tan veri alınamadı ({ne}).")
+
+
+def cek() -> list:
+    alanlar = sor(ALAN_SORGUSU, "il sınırları")
+    if len(alanlar) < len(ILLER):
+        raise SystemExit(
+            f"İl sınırı bulunamadı: {len(alanlar)} alan döndü, {len(ILLER)} bekleniyordu.\n"
+            "Sorgu başarısız olmuş olabilir; bu durumda sonuç 'bölgede tesis yok' gibi\n"
+            "görünür ve YANLIŞ olur. OSM'de il adları değişmiş olabilir — kontrol edin:\n"
+            "  https://overpass-turbo.eu  →  area[\"name\"=\"Konya\"][\"admin_level\"=\"4\"]; out ids;")
+    print(f"  il sınırları doğrulandı ({len(alanlar)} alan)")
+    time.sleep(2)   # Overpass'a nazik davran
+    return sor(SORGU, "üretim tesisleri")
 
 
 def main() -> None:
@@ -157,6 +185,17 @@ def main() -> None:
     gunes, ruzgar = topla("gunes"), topla("ruzgar")
     diger = sorted({t["kaynak"] for t in tesisler} - {"gunes", "ruzgar"})
 
+    # Güneşi sıfır çıkan bir sorgu, Konya için fiziksel olarak inandırıcı değil:
+    # bölgede Karapınar YEKA dahil büyük sahalar var. Böyle bir sonuç bulgu değil,
+    # sorgunun bozulduğunun işaretidir. Rüzgârın sıfır çıkması ise gerçek olabilir.
+    supheli = gunes["tesis_sayisi"] == 0
+    if supheli:
+        print("\nUYARI: Hiç güneş santrali bulunamadı. Konya'da büyük GES sahaları olduğu için",
+              file=sys.stderr)
+        print("bu sonuç bir bulgu değil, sorgunun çalışmadığının işareti olabilir.", file=sys.stderr)
+        print("Sonucu dürüstlük tablosuna İŞLEMEYİN; önce overpass-turbo.eu'da sınayın.",
+              file=sys.stderr)
+
     rapor = {
         "ne": "Konya–Karaman'da OpenStreetMap'te haritalanmış elektrik üretim tesisleri",
         "kaynak": "OpenStreetMap katkıcıları (ODbL), Overpass API",
@@ -166,6 +205,7 @@ def main() -> None:
         "ruzgar": ruzgar,
         "diger_kaynaklar": diger,
         "toplam_tesis": len(tesisler),
+        "supheli_sonuc": supheli,
         "ne_kanitlar": (
             "Bölgede rüzgâr santralinin güneşe kıyasla hangi ölçekte olduğunu gösterir. "
             "Tahsisli gücün GES kabul edilmesinin savunulabilir olup olmadığı sorusuna "
