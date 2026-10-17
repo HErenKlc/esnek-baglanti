@@ -1,5 +1,5 @@
 import "./stil.css";
-import { TRAFOLAR, TRAFO_KAYNAK, type Trafo } from "./veri/trafolar";
+import { TRAFOLAR, TRAFO_KAYNAK, KONUM_KAYNAK, type Trafo } from "./veri/trafolar";
 import { havaGetir, HAVA_KAYNAK, HAVA_YILLARI, type HavaSonucu } from "./veri/hava";
 import {
   senaryolarKur, altSinirSenaryolari, pvYillari, dagilim, enYuksekEkMW, egri, statikKalan,
@@ -437,6 +437,7 @@ async function yenile(yeniSenaryo: boolean) {
           <tr><td>Hava: ışınım (eğik yüzey), sıcaklık, rüzgâr</td><td>${HAVA_KAYNAK} ${t.ad} konumu, saatlik, ${new Set(s.havaYili).size} yıl (${s.havaYili[0]}–${s.havaYili.at(-1)}). Işınım: ${hava!.egikKaynak === "GTI" ? "30° güneye eğik yüzey" : "yatay (GTI alınamadı)"}; eksik değer ${yuzde(hava!.eksikOran, 2)}.</td><td><span class="etiket gercek">gerçek, canlı</span></td></tr>
           <tr><td>Yük şekli ve belirsizliği</td><td>EPİAŞ Şeffaflık Platformu ulusal saatlik tüketim ${rapor.veri} → LightGBM kantil + conformal.</td><td><span class="etiket gercek">gerçek veri</span></td></tr>
           <tr><td>Trafo üst sınırı ve tahsisli güç</td><td>${TRAFO_KAYNAK}</td><td><span class="etiket gercek">resmî, 01.10.2026</span></td></tr>
+          <tr><td>Trafo merkezi konumu</td><td>OpenStreetMap, <code>power=substation</code> (≥66 kV). Bölgedeki ${KONUM_KAYNAK.toplam} TM'nin ${KONUM_KAYNAK.osm}'si gerçek saha konumundan, ${KONUM_KAYNAK.ilce}'i ilçe merkezinden. Ulusal tabloda ${KONUM_KAYNAK.ulusalOsm}/${KONUM_KAYNAK.ulusalToplam}. Eşleşmeler il merkezine 200 km sınırıyla denetlendi; ilk denemede il dışına düşen 48 kayıt elendi.</td><td><span class="etiket gercek">açık veri, doğrulandı</span></td></tr>
           <tr><td>Emisyon faktörü</td><td>ETKB 2023 Ulusal Elektrik Şebekesi Emisyon Faktörü Bilgi Formu (UNFCCC CDM yöntemi); GES yaşam döngüsü IPCC AR5.</td><td><span class="etiket gercek">resmî</span></td></tr>
           <tr><td>GES üretimi</td><td>PVWatts modeli (pvlib-python ile birebir doğrulandı), DC/AC 1,2, kayıp %14.</td><td><span class="etiket gercek">standart model</span></td></tr>
           <tr><td>TM yük büyüklüğü</td><td><b>Ana sayı (${tr(altSinir)} MW) bu satırı hiç kullanmaz.</b> Yalnızca "yük bilgisiyle" üst senaryosunda devreye girer: ulusal şekil ${tr(durum.yukTepeMW)} MW tepeye ölçeklenir, en düşük gündüz yükü ${tr(s.enDusukGunduzYukMW, 1)} MW, ters akış sınırı ${tr(s.ihracatLimitiMW, 1)} MW. TM bazında gerçek yük Türkiye'de yayımlanmıyor (TEİAŞ YTBS topluyor, yayımlamıyor); EDAŞ'ın SCADA ölçümü girilince bu satır kalkar.</td><td><span class="etiket varsayim">yalnızca üst senaryoda</span></td></tr>

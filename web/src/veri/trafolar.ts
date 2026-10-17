@@ -17,32 +17,36 @@ export interface Trafo {
   boylam: number;
 }
 
-// Koordinatlar ilçe merkezi yaklaşığıdır (hava verisi çekmek için yeterli; TM'nin tam yeri değil).
+// Koordinatlar OpenStreetMap'teki gerçek trafo sahasından (model/osm_konum.py; power=substation,
+// >=66 kV). Eşleşme il merkezine 200 km sınırıyla doğrulandı; eşleşmeyen TM için ilçe merkezi.
 export const TRAFOLAR: Trafo[] = [
-  { ad: "Akşehir TM", il: "KONYA", tahsisMW: 12, maksMW: 12.95, kesin: true, enlem: 38.36, boylam: 31.42 },
-  { ad: "Alibeyhöyüğü TM", il: "KONYA", tahsisMW: 44, maksMW: 44, kesin: true, enlem: 37.6, boylam: 33.0 },
-  { ad: "Altınekin TM", il: "KONYA", tahsisMW: 25, maksMW: 25, kesin: true, enlem: 38.31, boylam: 32.87 },
-  { ad: "Beyşehir TM", il: "KONYA", tahsisMW: 26, maksMW: 26, kesin: true, enlem: 37.68, boylam: 31.72 },
-  { ad: "Cihanbeyli TM", il: "KONYA", tahsisMW: 22, maksMW: 22.94, kesin: true, enlem: 38.66, boylam: 32.93 },
-  { ad: "Çumra TM", il: "KONYA", tahsisMW: 25.67, maksMW: 26, kesin: true, enlem: 37.57, boylam: 32.77 },
-  { ad: "Ereğli TM", il: "KONYA", tahsisMW: 27.5, maksMW: 28, kesin: true, enlem: 37.51, boylam: 34.05 },
-  { ad: "Güneysınır TM", il: "KONYA", tahsisMW: 35, maksMW: 35, kesin: true, enlem: 37.27, boylam: 32.73 },
-  { ad: "Ilgın TM", il: "KONYA", tahsisMW: 20, maksMW: 20, kesin: true, enlem: 38.28, boylam: 31.91 },
-  { ad: "Karapınar TM", il: "KONYA", tahsisMW: 72, maksMW: 72, kesin: true, enlem: 37.72, boylam: 33.55 },
-  { ad: "Kızören TM", il: "KONYA", tahsisMW: 46.01, maksMW: 46.22, kesin: true, enlem: 38.25, boylam: 33.19 },
-  { ad: "Kolukısa TM", il: "KONYA", tahsisMW: 25, maksMW: 25, kesin: true, enlem: 38.17, boylam: 32.95 },
-  { ad: "Konya-1 TM", il: "KONYA", tahsisMW: 19.06, maksMW: 20, kesin: false, enlem: 37.87, boylam: 32.49 },
-  { ad: "Konya-2 TM", il: "KONYA", tahsisMW: 24.59, maksMW: 30, kesin: false, enlem: 37.9, boylam: 32.5 },
-  { ad: "Konya-3 TM", il: "KONYA", tahsisMW: 50, maksMW: 50, kesin: false, enlem: 37.95, boylam: 32.52 },
-  { ad: "Konya-4 TM", il: "KONYA", tahsisMW: 27.68, maksMW: 30, kesin: false, enlem: 37.84, boylam: 32.42 },
-  { ad: "Kulu TM", il: "KONYA", tahsisMW: 17, maksMW: 17, kesin: true, enlem: 39.09, boylam: 33.08 },
-  { ad: "Ladik TM", il: "KONYA", tahsisMW: 13.05, maksMW: 14, kesin: true, enlem: 38.2, boylam: 32.4 },
-  { ad: "Seydişehir TM", il: "KONYA", tahsisMW: 25, maksMW: 25, kesin: true, enlem: 37.42, boylam: 31.85 },
-  { ad: "Yunak TM", il: "KONYA", tahsisMW: 16, maksMW: 16, kesin: true, enlem: 38.82, boylam: 31.73 },
-  { ad: "Karaman OSB TM", il: "KARAMAN", tahsisMW: 22, maksMW: 51, kesin: true, enlem: 37.2, boylam: 33.17 },
-  { ad: "Karaman TM", il: "KARAMAN", tahsisMW: 32, maksMW: 32, kesin: true, enlem: 37.18, boylam: 33.22 },
+  { ad: "Akşehir TM", il: "KONYA", tahsisMW: 12, maksMW: 12.95, kesin: true, enlem: 38.3359, boylam: 31.4327 },
+  { ad: "Alibeyhöyüğü TM", il: "KONYA", tahsisMW: 44, maksMW: 44, kesin: true, enlem: 37.5319, boylam: 32.6622 },
+  { ad: "Altınekin TM", il: "KONYA", tahsisMW: 25, maksMW: 25, kesin: true, enlem: 38.3181, boylam: 32.8811 },
+  { ad: "Beyşehir TM", il: "KONYA", tahsisMW: 26, maksMW: 26, kesin: true, enlem: 37.7445, boylam: 31.696 },
+  { ad: "Cihanbeyli TM", il: "KONYA", tahsisMW: 22, maksMW: 22.94, kesin: true, enlem: 38.6671, boylam: 32.9164 },
+  { ad: "Çumra TM", il: "KONYA", tahsisMW: 25.67, maksMW: 26, kesin: true, enlem: 37.5751, boylam: 32.751 },
+  { ad: "Ereğli TM", il: "KONYA", tahsisMW: 27.5, maksMW: 28, kesin: true, enlem: 37.5405, boylam: 34.0878 },
+  { ad: "Güneysınır TM", il: "KONYA", tahsisMW: 35, maksMW: 35, kesin: true, enlem: 37.3076, boylam: 32.7241 },
+  { ad: "Ilgın TM", il: "KONYA", tahsisMW: 20, maksMW: 20, kesin: true, enlem: 38.2571, boylam: 31.8885 },
+  { ad: "Karapınar TM", il: "KONYA", tahsisMW: 72, maksMW: 72, kesin: true, enlem: 37.7313, boylam: 33.5511 },
+  { ad: "Kızören TM", il: "KONYA", tahsisMW: 46.01, maksMW: 46.22, kesin: true, enlem: 38.1435, boylam: 33.1764 },
+  { ad: "Kolukısa TM", il: "KONYA", tahsisMW: 25, maksMW: 25, kesin: true, enlem: 38.5308, boylam: 32.2957 },
+  { ad: "Konya-1 TM", il: "KONYA", tahsisMW: 19.06, maksMW: 20, kesin: false, enlem: 37.8612, boylam: 32.4682 },
+  { ad: "Konya-2 TM", il: "KONYA", tahsisMW: 24.59, maksMW: 30, kesin: false, enlem: 37.9528, boylam: 32.5116 },
+  { ad: "Konya-3 TM", il: "KONYA", tahsisMW: 50, maksMW: 50, kesin: false, enlem: 37.96, boylam: 32.6125 },
+  { ad: "Konya-4 TM", il: "KONYA", tahsisMW: 27.68, maksMW: 30, kesin: false, enlem: 38.0172, boylam: 32.6285 },
+  { ad: "Kulu TM", il: "KONYA", tahsisMW: 17, maksMW: 17, kesin: true, enlem: 39.156, boylam: 33.1151 },
+  { ad: "Ladik TM", il: "KONYA", tahsisMW: 13.05, maksMW: 14, kesin: true, enlem: 40.9345, boylam: 35.9026 },
+  { ad: "Seydişehir TM", il: "KONYA", tahsisMW: 25, maksMW: 25, kesin: true, enlem: 37.4594, boylam: 31.8625 },
+  { ad: "Yunak TM", il: "KONYA", tahsisMW: 16, maksMW: 16, kesin: true, enlem: 38.8123, boylam: 31.749 },
+  { ad: "Karaman OSB TM", il: "KARAMAN", tahsisMW: 22, maksMW: 51, kesin: true, enlem: 37.1867, boylam: 33.1943 },
+  { ad: "Karaman TM", il: "KARAMAN", tahsisMW: 32, maksMW: 32, kesin: true, enlem: 37.1867, boylam: 33.1943 },
   { ad: "Ayrancı (geçici) TM", il: "KARAMAN", tahsisMW: 8, maksMW: 8, kesin: true, enlem: 37.36, boylam: 33.83 },
 ];
+
+/** Koordinat kaynağı dağılımı (model/osm_konum.py çıktısından). Dürüstlük tablosunda gösterilir. */
+export const KONUM_KAYNAK = { osm: 21, ilce: 1, toplam: 23, ulusalOsm: 667, ulusalToplam: 794 };
 
 export const TRAFO_KAYNAK =
   "Kalan kapasite: TEİAŞ, \"2026 Yılı İçin Dağıtım Seviyesinden Transformatör Merkezi Bazlı … Kalan " +
