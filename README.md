@@ -48,6 +48,7 @@ Anlatım       Pano (risk cümlesi, eğri, ısı haritası)  ·  YZ planlama not
 | `model/edas_veri_talebi.md`, `bilgi_edinme_basvurusu.md`, `epdk_pilot_onerisi.md` | Veri talepleri ve pilot önerisi |
 | `model/sentetik_olcum.py` | Demo için sentetik TM yük profili — **gerçek ölçüm değildir**, manşet sayıya girmez |
 | `model/hava_onbellek.py` | Demo TM'lerinin 20 yıllık hava verisini önceden çeker; uygulama canlı API'ye bağımlı kalmaz |
+| `model/kaynak_kirilimi.py` | Bölgedeki kurulu güneş/rüzgâr tesislerini OSM'den sayar — tahsisli gücü GES saymanın savunulabilirliğini ölçer |
 | `web/src/veri` | Open-Meteo istemcisi, TEİAŞ TM tablosu, EDAŞ ölçüm okuyucusu |
 | `web/src/sim` | PVWatts GES modeli, senaryo kurma, kısıntı, batarya, fider gerilimi |
 | `web/api/ozet.ts` | Vercel fonksiyonu: planlama notu (Gemini, Claude yedekli; anahtar sunucuda) |
