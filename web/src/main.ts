@@ -427,8 +427,8 @@ async function yenile(yeniSenaryo: boolean) {
           <tr><td>GES üretimi</td><td>PVWatts modeli (pvlib-python ile birebir doğrulandı), DC/AC 1,2, kayıp %14.</td><td><span class="etiket gercek">standart model</span></td></tr>
           <tr><td>TM yük büyüklüğü</td><td><b>Ana sayı (${tr(altSinir)} MW) bu satırı hiç kullanmaz.</b> Yalnızca "yük bilgisiyle" üst senaryosunda devreye girer: ulusal şekil ${tr(durum.yukTepeMW)} MW tepeye ölçeklenir, en düşük gündüz yükü ${tr(s.enDusukGunduzYukMW, 1)} MW, ters akış sınırı ${tr(s.ihracatLimitiMW, 1)} MW. TM bazında gerçek yük Türkiye'de yayımlanmıyor (TEİAŞ YTBS topluyor, yayımlamıyor); EDAŞ'ın SCADA ölçümü girilince bu satır kalkar.</td><td><span class="etiket varsayim">yalnızca üst senaryoda</span></td></tr>
           <tr><td>Tahsisli güç tamamen GES</td><td>Tablo GES+RES toplamı veriyor; Konya-Karaman'da büyük çoğunluk GES.</td><td><span class="etiket varsayim">varsayım</span></td></tr>
-          <tr><td>Bağlantı hattı gerilimi</td><td>${fider ? `${tr(fider, 1)} MW sınır uygulanıyor (kısa hat formülü, katalog iletken verisi).` : "Hat kontrolü kapalı."} Ayrıntılı yük akışı (pandapower) bağlantı etüdünün işi.</td><td><span class="etiket ${fider ? "gercek" : "sentetik"}">${fider ? "mühendislik hesabı" : "kapalı"}</span></td></tr>
-          <tr><td>N-1, koruma, kısa devre</td><td>Bağlantı etüdünün konusu; bu araç kapasite ve kısıntı sorusunu cevaplar.</td><td><span class="etiket sentetik">kapsam dışı</span></td></tr>
+          <tr><td>Bağlantı hattı gerilimi</td><td>${fider ? `${tr(fider, 1)} MW sınır uygulanıyor (kısa hat formülü, katalog iletken verisi).` : "Hat kontrolü kapalı."} Ayrıntılı yük akışı (pandapower) bağlantı etüdünün işi.</td><td><span class="etiket ${fider ? "gercek" : "kapsamdisi"}">${fider ? "mühendislik hesabı" : "kapalı"}</span></td></tr>
+          <tr><td>N-1, koruma, kısa devre</td><td>Bağlantı etüdünün konusu; bu araç kapasite ve kısıntı sorusunu cevaplar.</td><td><span class="etiket kapsamdisi">kapsam dışı</span></td></tr>
         </tbody>
       </table>
     </section>

@@ -118,7 +118,7 @@ table.veri td.r { font-family: var(--rakam); font-size: 1rem; text-align: right;
 .etiket { display: inline-block; font-size: 0.78rem; padding: 0 8px; border-radius: 3px; white-space: nowrap; }
 .etiket.gercek { background: #d8ebe1; color: #1d5a3f; }
 .etiket.varsayim { background: #f7e7c2; color: #7a5204; }
-.etiket.sentetik { background: #f4d6d1; color: #8a2a1e; }
+.etiket.kapsamdisi { background: #f4d6d1; color: #8a2a1e; }
 
 .durum { padding: 60px 0; color: var(--murekkep-2); }
 .durum.hata { color: var(--kisinti); }
