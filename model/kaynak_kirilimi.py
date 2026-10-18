@@ -144,10 +144,16 @@ def cek() -> list:
 
 def main() -> None:
     klasor = Path(__file__).parent
-    trafolar = [t for t in json.loads((klasor / "trafo_konum.json").read_text(encoding="utf-8"))
-                if t["il"] in ("KONYA", "KARAMAN")]
+    bolge = [t for t in json.loads((klasor / "trafo_konum.json").read_text(encoding="utf-8"))
+             if t.get("il") in ("KONYA", "KARAMAN")]
+    # Koordinatı bulunamamış TM'ler var (osm_konum.py bazılarını eşleştiremedi).
+    # Bunlar "en yakın TM" hedefi olamaz; sessizce atlamak yerine sayıyı raporluyoruz.
+    trafolar = [t for t in bolge if t.get("enlem") is not None and t.get("boylam") is not None]
+    konumsuz = [t["tm"] for t in bolge if t not in trafolar]
     if not trafolar:
-        raise SystemExit("trafo_konum.json içinde Konya/Karaman TM'si yok.")
+        raise SystemExit("trafo_konum.json içinde koordinatlı Konya/Karaman TM'si yok.")
+    if konumsuz:
+        print(f"  not: {len(konumsuz)} TM'nin koordinatı yok, atama dışı: {', '.join(konumsuz)}")
 
     print(f"OpenStreetMap'ten {' ve '.join(ILLER)} üretim tesisleri çekiliyor…")
     ogeler = cek()
@@ -206,6 +212,8 @@ def main() -> None:
         "diger_kaynaklar": diger,
         "toplam_tesis": len(tesisler),
         "supheli_sonuc": supheli,
+        "atama_yapilan_TM": len(trafolar),
+        "koordinati_olmayan_TM": konumsuz,
         "ne_kanitlar": (
             "Bölgede rüzgâr santralinin güneşe kıyasla hangi ölçekte olduğunu gösterir. "
             "Tahsisli gücün GES kabul edilmesinin savunulabilir olup olmadığı sorusuna "

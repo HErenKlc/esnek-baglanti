@@ -48,7 +48,7 @@ Anlatım       Pano (risk cümlesi, eğri, ısı haritası)  ·  YZ planlama not
 | `model/edas_veri_talebi.md`, `bilgi_edinme_basvurusu.md`, `epdk_pilot_onerisi.md` | Veri talepleri ve pilot önerisi |
 | `model/sentetik_olcum.py` | Demo için sentetik TM yük profili — **gerçek ölçüm değildir**, manşet sayıya girmez |
 | `model/hava_onbellek.py` | Demo TM'lerinin 20 yıllık hava verisini önceden çeker; uygulama canlı API'ye bağımlı kalmaz |
-| `model/kaynak_kirilimi.py` | Bölgedeki kurulu güneş/rüzgâr tesislerini OSM'den sayar — tahsisli gücü GES saymanın savunulabilirliğini ölçer |
+| `model/kaynak_kirilimi.py` | Bölgedeki kurulu güneş/rüzgâr tesislerini OSM'den sayar — ölçüldü: 1.192 güneş / 84 rüzgâr |
 | `web/src/veri` | Open-Meteo istemcisi, TEİAŞ TM tablosu, EDAŞ ölçüm okuyucusu |
 | `web/src/sim` | PVWatts GES modeli, senaryo kurma, kısıntı, batarya, fider gerilimi |
 | `web/api/ozet.ts` | Vercel fonksiyonu: planlama notu (Gemini, Claude yedekli; anahtar sunucuda) |
@@ -119,6 +119,20 @@ Koruma etüdü röle ayarları ve akım trafosu oranları olmadan yapılamaz; bu
 - **Ara besleme (infeed) asıl soru.** Santral arızaya kendi payını bastığı için TM rölesi arıza akımının tamamını görmez: 40 MW'ta görmediği pay %19,1. Röle ayarı buna göre gözden geçirilmezse açma süresi uzar. Esnek bağlantıda bağlanan güç statik kuraldan büyük olduğu için bu etüt önkoşuldur.
 
 Ayrıntı ve hâlâ EDAŞ'tan gereken veri listesi: `model/baglanti_etut_notu.md`.
+
+## Tahsisli gücün GES sayılması — ölçüldü
+
+TEİAŞ'ın tablosu GES ve RES'i tek sütunda veriyor; uygulama tahsisli gücün tamamını GES kabul ediyor. Bu kabulün bölgede savunulabilir olup olmadığı 18 Ekim'de ölçüldü (`model/kaynak_kirilimi.py`, OpenStreetMap / ODbL):
+
+| | Güneş | Rüzgâr |
+|---|---|---|
+| Haritalanmış tesis | **1.192** | **84** |
+| Güç etiketi taşıyan | 22 (%1,8) | 10 (%11,9) |
+| Etiketli toplam güç | 1.882,5 MW | 256,4 MW |
+
+Sayıca 14 kat, etiketli güçte 7 kat fark. İkinci sayı tek başına dayanak değil — etiketleme oranları çok farklı olduğu için iki toplamı doğrudan karşılaştırmak yanıltıcı olur. Değerli olan, farklı yanlılıkları olan iki ölçünün aynı yöne işaret etmesi. **Rüzgâr sıfır değil**, ama güneşin yanında küçük kalıyor; tahsisli gücü GES saymak bu bölgede savunulabilir.
+
+Bu ölçüm TEİAŞ'ın tahsisli güç sütununu *karşılamaz*: o sütun kurulmamış tahsisleri de sayıyor, OSM ise yalnızca sahada olanı görüyor ve küçük çatı GES'lerini kaçırıyor. Tam ayrıştırma için EDAŞ fider verisi gerekiyor.
 
 ## Yöntemin geçerlilik sınırı
 
