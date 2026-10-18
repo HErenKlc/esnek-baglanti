@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test": "tsx tests/sim.test.ts && tsx tests/olcum.test.ts && tsx tests/fider.test.ts && tsx tests/hava.test.ts"
+    "test": "tsx tests/sim.test.ts && tsx tests/olcum.test.ts && tsx tests/fider.test.ts && tsx tests/hava.test.ts && tsx tests/hava_yaris.test.ts"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",

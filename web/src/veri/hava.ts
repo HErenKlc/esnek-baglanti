@@ -22,7 +22,11 @@ export interface HavaSonucu {
   egikKaynak: "GTI" | "GHI";
 }
 
-const onbellek = new Map<string, HavaSonucu>();
+// Sonucu değil, SÖZÜ (Promise) saklıyoruz. Sayfa açılışında yenile() birkaç yerden
+// eşzamanlı çağrılıyor; sonucu saklasaydık hepsi boş önbellek görüp aynı 1,6 MB'lık
+// dosyayı ayrı ayrı indirirdi (DevTools'ta iki kez göründüğü gibi). Söz saklanınca
+// ilk çağrı indirir, diğerleri onu bekler.
+const onbellek = new Map<string, Promise<HavaSonucu>>();
 
 /**
  * Önceden çekilmiş hava dosyasını çözer (model/hava_onbellek.py üretir).
@@ -45,20 +49,25 @@ function onbellekCoz(j: any): HavaSonucu {
   return { yillar, eksikOran: j.eksikOran ?? 0, egikKaynak: j.egikKaynak === "GHI" ? "GHI" : "GTI" };
 }
 
-export async function havaGetir(enlem: number, boylam: number, egim = 30): Promise<HavaSonucu> {
+export function havaGetir(enlem: number, boylam: number, egim = 30): Promise<HavaSonucu> {
   const anahtar = `${enlem.toFixed(2)},${boylam.toFixed(2)},${egim}`;
   const var_ = onbellek.get(anahtar);
   if (var_) return var_;
 
+  const soz = getir(enlem, boylam, egim);
+  onbellek.set(anahtar, soz);
+  // Başarısız bir söz önbellekte kalırsa "tekrar dene" düğmesi hiç çalışmaz: hata
+  // sonsuza kadar geri döner. O yüzden düşen sözü önbellekten çıkarıyoruz.
+  soz.catch(() => onbellek.delete(anahtar));
+  return soz;
+}
+
+async function getir(enlem: number, boylam: number, egim: number): Promise<HavaSonucu> {
   // Önce depoda hazır dosya var mı? Varsa canlı API'ye hiç gidilmez: demo günü
   // Open-Meteo yavaşlasa ya da kapalı olsa bile ilk ekran açılır.
   try {
     const r = await fetch(`/hava/${enlem.toFixed(2)}_${boylam.toFixed(2)}_${egim}.json`);
-    if (r.ok) {
-      const sonuc = onbellekCoz(await r.json());
-      onbellek.set(anahtar, sonuc);
-      return sonuc;
-    }
+    if (r.ok) return onbellekCoz(await r.json());
   } catch {
     // Dosya yok ya da bozuk: canlı çekmeye devam. Sessiz geçilir, davranış değişmez.
   }
@@ -74,10 +83,7 @@ export async function havaGetir(enlem: number, boylam: number, egim = 30): Promi
     wind_speed_unit: "ms",
     timezone: "Etc/GMT-3", // sabit UTC+3 (Türkiye Eylül 2016'dan beri; yaz saati boşluğu oluşmasın)
   });
-  const j = await getirTekrarla(`https://archive-api.open-meteo.com/v1/archive?${p}`);
-  const sonuc = ayristir(j);
-  onbellek.set(anahtar, sonuc);
-  return sonuc;
+  return ayristir(await getirTekrarla(`https://archive-api.open-meteo.com/v1/archive?${p}`));
 }
 
 async function getirTekrarla(url: string, deneme = 3): Promise<any> {
