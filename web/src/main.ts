@@ -59,6 +59,16 @@ const durum: Durum = {
   yukTepeMW: 40, hedef: 0.05, istatistik: "p90", bataryaSaat: 2, bataryaOrani: 0.3,
   efSecim: "cm", efOzel: 0.45, iletken: -1, mesafeKm: 10, fiderAdet: 2, cosPhi: 1, sinirYuzde: 2,
 };
+/**
+ * EDAŞ ölçüm yükleme alanı — pilot verisi gelene kadar ARAYÜZDE GİZLİ.
+ *
+ * Mimaride hiçbir şey sökülmedi: okuyucu (veri/olcum.ts), sentetik dosya algılama,
+ * ölçüm senaryoları (olcumSenaryolari), olcumYukle() ve tests/olcum.test.ts yerinde.
+ * MEDAŞ'tan 8.760 saatlik TM yükü geldiğinde tek yapılacak: bunu true yapmak.
+ * Çalışmayan bir düğmeyi jüriye göstermemek için kapatıldı, kaldırılmadı.
+ */
+const OLCUM_ACIK = false;
+
 const DEQ_M = 1.5; // 34,5 kV havai hatta eşdeğer faz açıklığı (varsayım)
 function fiderGirdisi(cos = durum.cosPhi): FiderGirdisi | null {
   const i = ILETKENLER[durum.iletken];
@@ -148,11 +158,13 @@ app.innerHTML = `
       <input id="yuk" type="range" min="10" max="120" step="1" />
       <small>Varsayım: TM yükü açık veri değil. Şekil gerçek EPİAŞ verisinden. Kanıt merdiveninin ilk basamağı bu varsayımı hiç kullanmaz.</small>
 
+      ${OLCUM_ACIK ? `
       <label for="olcumDosya">EDAŞ ölçümü (pilot)</label>
       <input id="olcumDosya" type="file" accept=".csv,.txt,text/csv,text/plain" />
       <div id="olcumDurum" class="olcum-durum"></div>
       <small>Dağıtım şirketinden 8.760 saatlik TM yükü (MW) gelirse buraya yükleyin: varsayım tamamen kalkar,
         aralık tek sayıya iner. Tek sütun ya da "tarih;MW" biçimi; dosya tarayıcıdan çıkmaz.</small>
+      ` : ""}
 
       <label for="hedef">Kabul edilen yıllık kısıntı <span class="deger" id="hedefD"></span></label>
       <input id="hedef" type="range" min="1" max="15" step="0.5" />
@@ -241,7 +253,7 @@ function ayarlariBagla() {
   let zaman: number | undefined;
   const gecikmeli = (yeniSenaryo: boolean) => { goster(); clearTimeout(zaman); zaman = window.setTimeout(() => yenile(yeniSenaryo), 180); };
   yuk.addEventListener("input", () => { durum.yukTepeMW = +yuk.value; gecikmeli(true); });
-  ($("olcumDosya") as HTMLInputElement).addEventListener("change", olcumYukle);
+  if (OLCUM_ACIK) ($("olcumDosya") as HTMLInputElement).addEventListener("change", olcumYukle);
   hedef.addEventListener("input", () => { durum.hedef = +hedef.value / 100; gecikmeli(false); });
   batG.addEventListener("change", () => { durum.bataryaOrani = Math.max(0, +batG.value / 100); gecikmeli(false); });
   batS.addEventListener("change", () => { durum.bataryaSaat = Math.max(0, +batS.value); gecikmeli(false); });
@@ -374,7 +386,7 @@ async function yenile(yeniSenaryo: boolean) {
         <li${olcum ? ' class="m-aktif"' : ""}><span class="m-ad">EDAŞ ölçümüyle</span><span class="m-sayi">${olcum ? `${tr(esnek)} MW` : "pilot"}</span>
           <span class="m-not">${olcum
             ? `<b>${olcum.ad}</b> yüklendi: ${olcum.satir.toLocaleString("tr")} saat, tepe ${tr(olcum.tepeMW, 1)} MW, en düşük gündüz yükü ${tr(olcum.enDusukGunduzMW, 1)} MW. ${olcum.sentetik ? "<b>Bu dosya SENTETİKTİR, gerçek ölçüm değildir</b> — yalnızca ölçüm geldiğinde ne olacağını göstermek için." : "Yük varsayımı devrede değil; aralık tek sayıya indi."}`
-            : "TM'nin kendi SCADA yükü girilince aralık tek sayıya iner. Yöntem değişmez, sadece girdi değişir. Soldaki \"EDAŞ ölçümü\" alanından yüklenir."}</span></li>
+            : `TM'nin kendi SCADA yükü girilince aralık tek sayıya iner. Yöntem değişmez, sadece girdi değişir. ${OLCUM_ACIK ? "Soldaki \"EDAŞ ölçümü\" alanından yüklenir." : "Okuyucu yazıldı ve sınandı; pilot verisi geldiğinde devreye alınacak."}`}</span></li>
       </ol>
     </section>
 
