@@ -771,8 +771,9 @@ async function ozetIste() {
     if (!r.ok) throw new Error(j.hata || r.statusText);
     kutu.innerHTML = j.metin.split(/\n+/).filter(Boolean).map((p: string) => `<p>${p.replace(/</g, "&lt;")}</p>`).join("") +
       `<p class="kaynak">${j.kaynak === "sablon"
-        ? `Şablon metin${j.uyari ? ` (${String(j.uyari).replace(/</g, "&lt;")})` : ""}.`
+        ? `Şablon metin${j.uyari ? ` (${String(j.uyari).replace(/</g, "&lt;")})` : ""}.</p><button class="dugme kucuk-dugme" id="ozetBtn">Tekrar dene</button><p class="kaynak">`
         : `${j.kaynak === "claude" ? "Claude" : "Gemini"} (${j.model}) yazdı; sayılar simülasyondan.`}</p>`;
+    document.getElementById("ozetBtn")?.addEventListener("click", ozetIste);
   } catch (e) {
     kutu.innerHTML = `<p>Not oluşturulamadı: ${(e as Error).message}</p><button class="dugme" id="ozetBtn">Tekrar dene</button>`;
     document.getElementById("ozetBtn")!.addEventListener("click", ozetIste);

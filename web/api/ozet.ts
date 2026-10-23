@@ -21,9 +21,9 @@ const virgul = (x: unknown) => String(x).replace(".", ",");
 function sablon(o: any): string {
   const y = (x: number) => `%${(x * 100).toFixed(1).replace(".", ",")}`;
   return [
-    `${o.trafo}: statik kurala göre ${o.statik_kalan_MW} MW boş görünüyor. Esnek bağlantıyla ${o.esnek_MW ?? o.esnek_ek_MW} MW ek GES bağlanabilir.`,
-    `Bu güçte yeni projenin yıllık kısıntısı tipik yılda ${y(o.kisinti_P50)}, kötü yılda ${y(o.kisinti_P90)}. Mevcut santraller kısılmıyor.`,
-    `Öneri: ${o.kabul_kisinti * 100}% kısıntı sınırlı esnek bağlantı anlaşmasıyla pilot başvuru değerlendirilebilir. Batarya: ${o.batarya}.`,
+    `${o.trafo}: statik kurala göre ${virgul(o.statik_kalan_MW)} MW boş görünüyor. Trafo yükü hakkında hiçbir varsayım yapmadan esnek bağlantıyla ${virgul(o.yuk_varsayimsiz_alt_sinir_MW)} MW ek GES bağlanabilir; TM yükü bilinirse bu ${virgul(o.esnek_MW)} MW'a çıkar.`,
+    `Yük bilgisiyle bağlanan güçte yeni projenin yıllık kısıntısı tipik yılda ${y(o.kisinti_P50)}, kötü yılda ${y(o.kisinti_P90)}. Mevcut santraller kısılmıyor.`,
+    `Öneri: %${virgul(+(o.kabul_kisinti * 100).toFixed(1))} kısıntı sınırlı esnek bağlantı anlaşmasıyla pilot başvuru değerlendirilebilir. Batarya: ${o.batarya}.`,
     ...(Array.isArray(o.varsayimsiz_alt_sinir) ? [`Para karşılığı (varsayımsız alt sınır): ${o.varsayimsiz_alt_sinir.map((m: any) => `${m.risk_olcusu} ${virgul(m.ek_MW)} MW, yılda ≈ ${virgul(m.yillik_gelir_milyon_TL)} milyon TL satış, kısıntı bedeli ≈ ${virgul(m.yillik_kisinti_bedeli_milyon_TL)} milyon TL`).join("; ")}.`] : []),
     `Dikkat: TM yükü (${o.yuk_tepe_varsayim_MW} MW tepe) varsayımdır; gerilim ve koruma etüdü yapılmamıştır.`,
   ].join("\n");
@@ -31,6 +31,19 @@ function sablon(o: any): string {
 
 /** Markdown işaretlerini temizler; arayüz düz paragraf bekliyor. */
 const duzelt = (s: string) => s.trim().replace(/\*\*/g, "").replace(/^#+\s*/gm, "");
+
+/** Geçici hatada (yoğunluk, 429/5xx) kısa beklemeyle yeniden dener; kalıcı hatada hemen bırakır. */
+async function tekrarla<T>(f: () => Promise<T>, deneme = 3): Promise<T> {
+  let son: unknown;
+  for (let i = 0; i < deneme; i++) {
+    try { return await f(); } catch (e) {
+      son = e;
+      if (!/high demand|overloaded|unavailable|rate|quota|429|500|502|503|504/i.test((e as Error).message)) break;
+      if (i < deneme - 1) await new Promise((r) => setTimeout(r, 1500 * (i + 1)));
+    }
+  }
+  throw son;
+}
 
 async function gemini(o: any, anahtar: string) {
   const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
@@ -80,9 +93,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const sira: Array<() => Promise<{ metin: string; kaynak: string; model: string }>> = [];
   if (process.env.SAGLAYICI === "claude") {
     if (c) sira.push(() => claude(o, c));
-    if (g) sira.push(() => gemini(o, g));
+    if (g) sira.push(() => tekrarla(() => gemini(o, g)));
   } else {
-    if (g) sira.push(() => gemini(o, g));
+    if (g) sira.push(() => tekrarla(() => gemini(o, g)));
     if (c) sira.push(() => claude(o, c));
   }
 
@@ -96,6 +109,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   return res.status(200).json({
     metin: sablon(o), kaynak: "sablon",
-    uyari: hatalar.length ? hatalar.join(" · ") : "Sağlayıcı anahtarı tanımlı değil",
+    uyari: !hatalar.length ? "dil modeli anahtarı tanımlı değil"
+      : hatalar.some((h) => /high demand|overloaded|unavailable|rate|quota|429|503/i.test(h))
+        ? "Gemini şu an yoğun; sayılar aynı, not şablonla yazıldı. Birkaç saniye sonra tekrar deneyebilirsiniz"
+        : "dil modeline ulaşılamadı; sayılar aynı, not şablonla yazıldı",
   });
 }
