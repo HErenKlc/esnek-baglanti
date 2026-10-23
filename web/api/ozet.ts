@@ -12,15 +12,19 @@ Türkçe, en fazla 4 kısa paragrafta bir planlama notu yaz:
 2) Risk: kısıntının P50/P90 değerleri ne demek; yatırımcı için anlamı.
 3) Öneri: ne kadar MW, hangi koşulla (kısıntı sınırı, batarya), tek somut adım.
 4) Dikkat: bu analizin modellemediği şey (gerilim, N-1, koruma) ve TM yükünün varsayım olduğu.
+JSON'da varsayimsiz_alt_sinir altında yıllık gelir ve kısıntı bedeli (milyon TL) varsa, 2. paragrafta yatırımcı için bunu tek cümleyle söyle.
 Kurallar: JSON'da olmayan hiçbir sayı yazma. Sayıları Türkçe biçimde yaz (virgüllü ondalık). Abartma, reklam dili kullanma.
 Biçim: düz metin yaz. Yıldız, kalın, başlık, madde imi veya başka markdown işareti kullanma. Her paragrafı tamamla; yarım cümle bırakma. Toplam 150 kelimeyi geçme.`;
+
+const virgul = (x: unknown) => String(x).replace(".", ",");
 
 function sablon(o: any): string {
   const y = (x: number) => `%${(x * 100).toFixed(1).replace(".", ",")}`;
   return [
-    `${o.trafo}: statik kurala göre ${o.statik_kalan_MW} MW boş görünüyor. Esnek bağlantıyla ${o.esnek_ek_MW} MW ek GES bağlanabilir.`,
+    `${o.trafo}: statik kurala göre ${o.statik_kalan_MW} MW boş görünüyor. Esnek bağlantıyla ${o.esnek_MW ?? o.esnek_ek_MW} MW ek GES bağlanabilir.`,
     `Bu güçte yeni projenin yıllık kısıntısı tipik yılda ${y(o.kisinti_P50)}, kötü yılda ${y(o.kisinti_P90)}. Mevcut santraller kısılmıyor.`,
     `Öneri: ${o.kabul_kisinti * 100}% kısıntı sınırlı esnek bağlantı anlaşmasıyla pilot başvuru değerlendirilebilir. Batarya: ${o.batarya}.`,
+    ...(Array.isArray(o.varsayimsiz_alt_sinir) ? [`Para karşılığı (varsayımsız alt sınır): ${o.varsayimsiz_alt_sinir.map((m: any) => `${m.risk_olcusu} ${virgul(m.ek_MW)} MW, yılda ≈ ${virgul(m.yillik_gelir_milyon_TL)} milyon TL satış, kısıntı bedeli ≈ ${virgul(m.yillik_kisinti_bedeli_milyon_TL)} milyon TL`).join("; ")}.`] : []),
     `Dikkat: TM yükü (${o.yuk_tepe_varsayim_MW} MW tepe) varsayımdır; gerilim ve koruma etüdü yapılmamıştır.`,
   ].join("\n");
 }

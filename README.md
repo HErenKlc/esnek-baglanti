@@ -2,13 +2,43 @@
 
 **"Kapasite yok" denen trafo merkezine, kısıntı riskini bilerek ne kadar temiz enerji bağlanabilir?**
 
-Climathon 2026 (Siemens × YGA × UP School) · Görev 3 · Hüseyin Eren Kılıç
+Climathon 2026 (Siemens × YGA × UP School) · Hüseyin Eren Kılıç
 
 Canlı araç: **[esnek-baglanti.vercel.app](https://esnek-baglanti.vercel.app)**
 
 Türkiye'de 2024–2025'te 11,6 GW lisanssız GES/RES başvurusunun %65'i kapasite yok denerek reddedildi ([Ember](https://ember-energy.org/latest-insights/turkiye-can-bypass-grid-constraints-with-hybrid-solar-power-plants/grid-connection-capacity-challenges-in-turkiye-and/)). Kapasite, en kötü iki anın (tam üretim + en düşük yük) aynı anda olacağını varsayan statik bir kuralla hesaplanıyor. Bu araç, bir trafo merkezi için gerçek hava ve yük belirsizliğini saat saat simüle ederek esnek (kısılabilir) bağlantıyla kaç MW daha bağlanabileceğini ve bunun yıllık kısıntı bedelini (P50/P90) hesaplar.
 
 TEİAŞ'ın 01.10.2026 tarihli tablosunda 794 trafo merkezinin **346'sında (%43,6) kalan kapasite sıfır**; ülke genelindeki kalan kapasite 2,5 ayda 833,59 MWe'den 625,10 MWe'ye, yani %25 düştü.
+
+## Tek bakışta: Karapınar TM
+
+Statik kurala göre dolu (72 / 72 MW). Trafodaki yük hakkında hiçbir varsayım yapmadan, %5 kısıntı kabulüyle:
+
+| Risk ölçüsü | Eklenebilen güç | Statik kural | Yatırımcıya yıllık satış | Kısıntı bedeli |
+| --- | --- | --- | --- | --- |
+| P50, tipik yıl | **11,5 MW** | 0 MW | ≈ 57,8 milyon TL | ≈ 3,0 milyon TL |
+| P90, kötü yıl (bankanın istediği) | **10,4 MW** | 0 MW | ≈ 52,4 milyon TL | ≈ 2,8 milyon TL |
+
+Para karşılığı = şebekeye verilen ek enerji × elektrik fiyatı. Varsayılan fiyat 2025 yıllık ortalama piyasa takas fiyatı (PTF, EPİAŞ Gün Öncesi Piyasası) 2.618 TL/MWh; arayüzde değiştirilebilir ve MW hesabına girmez. Muhafazakâr bir seçim: Aralık 2025 aylık ortalaması 2.973 TL/MWh (ETKB Aylık Enerji Bülteni, Ocak 2026). Statik kuralda bu gelir sıfırdır, çünkü başvuru reddedilir; esnek bağlantı yeni trafo merkezi gerektirmez. P50 seçiliyken net önlenen emisyon ≈ 11,7 bin tCO₂/yıl (P90 seçiliyken ≈ 10,7 bin). P90 sütunundaki para karşılığı, ortalama üretime kötü yılın kısıntı oranı uygulanarak bulunur.
+
+Arayüz tek link, üç görünüm: **Karar** (EDAŞ planlama mühendisi ve yatırımcı: TM seç, P50/P90 yan yana, para karşılığı, planlama notu), **Bölge ve Türkiye** (23 TM'lik bölge hesabı ve 794 TM'lik ulusal tablo), **Kanıt** (kanıt merdiveni, kısıntı eğrisi, geri test, yük modeli, dürüstlük tablosu). Görünüm linke yazılır (`&s=kanit`).
+
+## COP31 ve Siemens ile nerede durur
+
+COP31'in hedeflerinden biri elektrifikasyonu 2035'e kadar %35'e çıkarmak; artışın büyük kısmının yenilenebilirden gelmesi bekleniyor. Türkiye'de bunun darboğazı panel fiyatı ya da arazi değil, şebeke bağlantısı: yatırım hazır, bağlantı izni yok. Bu araç, yeni trafo merkezi kurmadan (3–5 yıl ve yüksek maliyet) mevcut bakırla ne kadar yer açılabileceğini sayıya döker.
+
+Siemens'in Gridscale X ürün ailesi dağıtım şirketlerine şebekeyi işletirken esnekliği yönetme araçları sunuyor. Esnek Bağlantı Motoru bunun bir adım öncesinde duruyor: **planlama aşamasında**, bir bağlantı başvurusuna "hayır" yerine "şu kadar MW, şu kısıntı riskiyle" cevabını üretiyor. Yani işletme araçlarının ihtiyaç duyduğu bağlantı kararını veriye dayandırıyor. Çerçeve "veri var ama karar yok" boşluğu: TEİAŞ tablosu, hava ve tüketim verisi açık; bunları bağlantı kararına çeviren araç yok.
+
+## Benzerleriyle kıyas
+
+| Örnek | Ne yapıyor | Bu araçtan farkı |
+| --- | --- | --- |
+| UK Power Networks (İngiltere) esnek bağlantıları | Kısılabilir bağlantı; esnek bağlantılarda ortalama kısıntı ≈ %2 | Kamuya açık bağlantı bazında bir P50/P90 risk aralığı bulamadık |
+| Hollanda "non-firm" bağlantı sözleşmeleri | Mevzuatla tanımlı kısılabilir bağlantı | Mevzuat çerçevesi; bağlantı başına risk hesabı aracı değil |
+| Siemens Gridscale X | İşletme aşamasında esneklik yönetimi | İşletme tarafı; bu araç planlama tarafında, başvuru anında |
+| Türkiye'de bugün | Statik kural: "tam üretim + en düşük yük her saat" | Evet/hayır cevabı; kısıntı riski hiç hesaplanmıyor |
+
+**Bu aracın farkı:** TM yükü bilinmeden bile geçerli, güvenli tarafta kalan bir alt sınır; bankanın istediği P90 kötü yıl; 8 yıllık geri test; ve her katmanın gerçek mi varsayım mı olduğunu yazan bir dürüstlük tablosu.
 
 ## Kanıt merdiveni
 
@@ -151,6 +181,18 @@ Emisyon hesabı "esnek bağlantı olmasaydı bu MW hiç bağlanmazdı" der. Bu b
 
 Üstelik %8,3 cömert bir üst sınır: kalan kapasite 81 ile dağılmış durumda ve reddedilen projenin bulunduğu bölgede olmayabilir. Üç ilde (Ardahan, Kırıkkale, Yalova) hiçbir TM'de kapasite kalmamıştır.
 
+## Yapay zekâ nerede, nasıl kullanıldı
+
+**Çözümün içinde.** Kullanıcının gördüğü P50/P90 sayısını yük modeli üretiyor: EPİAŞ'ın 10 yıllık saatlik tüketiminden eğitilen LightGBM kantil regresyonu + conformal kalibrasyon. Model olmadan o sayı yok. Gemini ise yalnızca simülasyonun JSON çıktısını EDAŞ planlama mühendisinin okuyacağı kısa bir nota çeviriyor; sistem talimatında "JSON'da olmayan hiçbir sayıyı yazma" kuralı var.
+
+**Geliştirirken.** Kod ve doküman taslaklarında Claude'u (Anthropic) yardımcı olarak kullandım; problem seçimi, yöntem kararları ve sayıların doğrulanması bana ait. Yapay zekânın yazdığı her hesap bağımsız bir referansla sınandı: GES modeli pvlib-python ile, gerilim formülü pandapower yük akışıyla, yük modeli eğitimde görmediği 2025 yılıyla ve 8 yıllık geri testle. pvlib ve pandapower karşılaştırmaları `npm test` içinde kilitli; yük modelinin 2025 testi `model/train.py` çıktısında (`web/public/model_raporu.json`), 8 yıllık geri test arayüzün Kanıt sekmesinde her açılışta yeniden hesaplanıyor.
+
+**Canlıya alma.** GitHub → Vercel (Root Directory `web`). Ağır hesap tarayıcıda; sunucuda yalnızca planlama notu fonksiyonu çalışıyor, API anahtarı istemciye gitmiyor.
+
+**Limitlere takılınca.** Gemini erişilemezse not Claude'a, o da yoksa sabit şablona düşüyor; demo hiçbir durumda boş kalmıyor. Open-Meteo'nun hız sınırı demo sırasında boş ekran riski yarattığı için demo trafolarının 20 yıllık hava verisi önceden çekilip statik dosyaya konuldu (`model/hava_onbellek.py`). Google AI Studio Build modu çekirdek hesabı (tarayıcıda 100+ senaryo × 8.760 saat Monte Carlo ve Python'da eğitilen model) karşılamadığı için uygulama Vite + TypeScript ile yazıldı.
+
+**Yapay zekânın kendi ayak izi.** Yük modeli GPU'suz, sıradan bir bilgisayarda dakikalar içinde eğitiliyor; uygulamadaki hesap kullanıcının tarayıcısında saniyeler sürüyor. Bunun enerji tüketimi, tek bir trafo merkezinde önlenen yıllık ≈ 11.700 tCO₂'nin yanında ihmal edilebilir mertebede.
+
 ## Atıf ve lisans
 
 - Hava: [Open-Meteo](https://open-meteo.com) (CC BY 4.0), ERA5 — Copernicus Climate Change Service bilgisi kullanılmıştır.
@@ -159,5 +201,6 @@ Emisyon hesabı "esnek bağlantı olmasaydı bu MW hiç bağlanmazdı" der. Bu b
 - TM konumları: [OpenStreetMap](https://www.openstreetmap.org) katkıcıları (ODbL), Overpass API.
 - GES modeli: [pvlib-python](https://github.com/pvlib/pvlib-python) PVWatts ve Faiman modellerinin TypeScript uyarlaması.
 - Yük akışı: [pandapower](https://pandapower.org).
+- Elektrik fiyatı: EPİAŞ Gün Öncesi Piyasası PTF, 2025 yıllık ortalama ([derleme](https://myenerji.com/2012-2024-ptf-yekdem-fiyatlari/)); karşılaştırma için [ETKB Aylık Enerji Bülteni, Ocak 2026](https://enerji.gov.tr/Media/Dizin/SGB/tr/AYLIK_ENERJI_BULTENI/2026/OCAK/e-BULTEN_Ocak_2026.pdf).
 
 Bu bir prototiptir ve bağlantı etüdünün yerine geçmez. Gerçek bağlantı kararı için EDAŞ'ın SCADA yük ölçümü, fiderin tamamını kapsayan gerilim etüdü ve röle ayarlarıyla yapılan koruma etüdü gerekir. Bu üç başlıkta nerede durulduğu — ne yapıldı, ne yapılamaz, hangi veri hâlâ eksik — `model/baglanti_etut_notu.md` içinde yazılı.

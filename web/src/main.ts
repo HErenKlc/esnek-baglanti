@@ -37,8 +37,20 @@ function tasinabilirPay(u: Ulusal | null): number | null {
   return Math.min(1, u.toplamKalanMWe / REDDEDILEN_MW);
 }
 
+// Ekonomik karşılık: ek enerji × elektrik fiyatı. Varsayılan fiyat 2025 yıllık ortalama piyasa takas fiyatı
+// (PTF, EPİAŞ Gün Öncesi Piyasası): 2.617,83 TL/MWh — myenerji.com "2012-2026 PTF-YEKDEM fiyatları" derlemesi.
+// Muhafazakâr seçim: Aralık 2025 aylık ortalaması 2.973 TL/MWh (ETKB Aylık Enerji Bülteni, Ocak 2026),
+// Ekim 2026 günlük PTF'ler 3.200 TL/MWh'nin üzerinde. Kullanıcı kendi fiyatını girebilir.
+const PTF_VARSAYILAN = 2618;
+const PTF_KAYNAK = "2025 yıllık ortalama PTF, EPİAŞ GÖP";
+const milyonTL = (tl: number) => `${tr(tl / 1e6, 1)} milyon TL`;
+
+type Sekme = "karar" | "bolge" | "kanit";
+let sekme: Sekme = "karar";
+
 type EfSecim = "cm" | "bm" | "om" | "ozel";
 interface Durum {
+  ptf: number; // TL/MWh
   trafo: Trafo;
   yukTepeMW: number;
   hedef: number;
@@ -55,8 +67,9 @@ interface Durum {
 }
 
 const durum: Durum = {
+  ptf: PTF_VARSAYILAN,
   trafo: TRAFOLAR.find((t) => t.ad.startsWith("Karapınar"))!,
-  yukTepeMW: 40, hedef: 0.05, istatistik: "p90", bataryaSaat: 2, bataryaOrani: 0.3,
+  yukTepeMW: 40, hedef: 0.05, istatistik: "p50", bataryaSaat: 2, bataryaOrani: 0.3,
   efSecim: "cm", efOzel: 0.45, iletken: -1, mesafeKm: 10, fiderAdet: 2, cosPhi: 1, sinirYuzde: 2,
 };
 /**
@@ -103,6 +116,9 @@ const efNet = (brut = efBrut()) => Math.max(0, brut - GES_YASAM_DONGUSU);
   durum.fiderAdet = Math.round(sayi("fa", 1, 8) ?? durum.fiderAdet);
   durum.cosPhi = q.get("cos") === "0.95" ? 0.95 : 1;
   durum.sinirYuzde = sayi("du", 0.5, 10) ?? durum.sinirYuzde;
+  durum.ptf = sayi("ptf", 100, 20000) ?? durum.ptf;
+  const sk = q.get("s");
+  if (sk === "bolge" || sk === "kanit") sekme = sk;
 })();
 
 function urlYaz() {
@@ -115,6 +131,8 @@ function urlYaz() {
     q.set("il", String(durum.iletken)); q.set("km", String(durum.mesafeKm)); q.set("fa", String(durum.fiderAdet));
     q.set("cos", String(durum.cosPhi)); q.set("du", String(durum.sinirYuzde));
   }
+  if (durum.ptf !== PTF_VARSAYILAN) q.set("ptf", String(durum.ptf));
+  if (sekme !== "karar") q.set("s", sekme);
   history.replaceState(null, "", `${location.pathname}?${q}`);
 }
 
@@ -146,7 +164,9 @@ app.innerHTML = `
   <h1>Esnek Bağlantı Motoru</h1>
   <p>"Kapasite yok" denen trafo merkezine, kısıntı riskini bilerek ne kadar temiz enerji bağlanabilir?</p>
   <button class="rozet paylas" id="paylas">Senaryo linkini kopyala</button>
-  <span class="rozet">Climathon 2026 · Görev 3 prototipi</span>
+  <span class="rozet">Climathon 2026 · prototip</span>
+  <p class="ust-cop">COP31'in elektrifikasyonu 2035'e kadar %35'e çıkarma hedefinde darboğaz panel değil, şebeke bağlantısı.
+    Bu araç bugünkü trafolarla, yeni yatırım beklemeden ne kadar yer açılabileceğini hesaplar.</p>
 </header>
 <div class="yerlesim">
   <aside class="sol" aria-label="Trafo merkezi ve varsayımlar">
@@ -204,6 +224,10 @@ app.innerHTML = `
       </select>
       <input id="efOzel" type="number" min="0.05" max="1.2" step="0.01" aria-label="Özel emisyon faktörü, tCO₂/MWh" hidden />
       <small>tCO₂/MWh. ETKB 2023 bilgi formu (UNFCCC CDM yöntemi). GES'in yaşam döngüsü emisyonu (IPCC AR5: 0,048) düşülür.</small>
+
+      <label for="ptf">Elektrik fiyatı <span class="deger" id="ptfD"></span></label>
+      <input id="ptf" type="number" min="100" max="20000" step="1" aria-label="Elektrik fiyatı, TL/MWh" />
+      <small>TL/MWh. Varsayılan ${tr(PTF_VARSAYILAN)}: ${PTF_KAYNAK}. Yalnızca para karşılığını değiştirir; MW ve kısıntı hesabına girmez.</small>
     </div>
   </aside>
   <main class="ana" id="ana" aria-live="polite">
@@ -238,7 +262,9 @@ function ayarlariBagla() {
   const efSec = $<HTMLSelectElement>("efSec"), efOzel = $<HTMLInputElement>("efOzel");
   const iletken = $<HTMLSelectElement>("iletken"), mesafe = $<HTMLInputElement>("mesafe"), fiderAdet = $<HTMLInputElement>("fiderAdet");
   const cosPhi = $<HTMLSelectElement>("cosPhi"), du = $<HTMLInputElement>("du");
+  const ptf = $<HTMLInputElement>("ptf");
   const goster = () => {
+    ptf.value = String(durum.ptf); $("ptfD").textContent = `${tr(durum.ptf)} TL/MWh`;
     yuk.value = String(durum.yukTepeMW); hedef.value = String(durum.hedef * 100);
     batG.value = String(Math.round(durum.bataryaOrani * 100)); batS.value = String(durum.bataryaSaat);
     iletken.value = String(durum.iletken); $("fiderAyar").hidden = durum.iletken < 0;
@@ -263,6 +289,7 @@ function ayarlariBagla() {
   cosPhi.addEventListener("change", () => { durum.cosPhi = +cosPhi.value; gecikmeli(false); });
   du.addEventListener("change", () => { durum.sinirYuzde = Math.min(10, Math.max(0.5, +du.value || 2)); gecikmeli(false); });
   efSec.addEventListener("change", () => { durum.efSecim = efSec.value as EfSecim; gecikmeli(false); });
+  ptf.addEventListener("change", () => { durum.ptf = Math.min(20000, Math.max(100, Math.round(+ptf.value || PTF_VARSAYILAN))); gecikmeli(false); });
   efOzel.addEventListener("change", () => { durum.efOzel = Math.min(1.2, Math.max(0.05, +efOzel.value || 0.45)); gecikmeli(false); });
   document.querySelectorAll<HTMLButtonElement>("[data-ist]").forEach((b) =>
     b.addEventListener("click", () => { durum.istatistik = b.dataset.ist as "p50" | "p90"; gecikmeli(false); }));
@@ -329,6 +356,21 @@ async function yenile(yeniSenaryo: boolean) {
   const dAlt = dagilim(altSc, girdi, Math.max(altSinir, 0.01));
   const kisintiAlt = durum.istatistik === "p90" ? dAlt.p90 : dAlt.p50;
 
+  // Manşet: varsayımsız alt sınır iki risk ölçüsüyle yan yana. Seçili ölçü yukarıdaki hesapla aynı sayıyı verir;
+  // diğeri ayrıca hesaplanır. Para karşılığı tipik yıl (P50) teslim ve kısılan enerjisinden.
+  const manset = (["p50", "p90"] as const).map((ist) => {
+    const mw = ist === durum.istatistik ? altSinir : Math.max(statik, enYuksekEkMW(altSc, girdi, durum.hedef, ist));
+    const dd = dagilim(altSc, girdi, Math.max(mw, 0.01));
+    const ekMWh_ = ekEnerji(altSc, girdi, mw, statik);
+    // P50: tipik yılın teslim ve kısılan enerjisi. P90: kötü yıl — potansiyel üretim × (1 − P90 kısıntı), statik üstü pay.
+    // Kısıntı bedeli: yeni projenin kısılan enerjisi × fiyat (LIFO: mevcut santraller kısılmaz).
+    const k = ist === "p90" ? dd.p90 : dd.p50;
+    const teslimStatik = statik > 0.01 ? dagilim(altSc, girdi, statik).teslimP50MWh : 0;
+    const ek = ist === "p50" ? ekMWh_ : Math.max(0, dd.potansiyelMWh * (1 - k) - teslimStatik);
+    const kisilan = ist === "p50" ? dd.kisilanP50MWh : dd.potansiyelMWh * k;
+    return { ist, mw, kisinti: k, ekMWh: ek, gelirTL: ek * durum.ptf, bedelTL: kisilan * durum.ptf };
+  });
+
   // Geri test: model test yılını görmeden boyutlandırır; o yılın gerçek havası + gerçek EPİAŞ yükü ile gerçekleşen kısıntı
   const geri = geriTest ? geriYillari().map((y) => geriTestYili(hava!.yillar, geriTest!, y, girdi, durum.hedef, durum.istatistik))
     .filter((r): r is YilSonucu => r !== null) : [];
@@ -355,31 +397,92 @@ async function yenile(yeniSenaryo: boolean) {
     geri_test: geri.map((r) => ({ yil: r.yil, model_MW: +r.modelMW.toFixed(1), model_gerceklesen_kisinti: +r.modelGercek.toFixed(4),
       naif_MW: +r.naifMW.toFixed(1), naif_gerceklesen_kisinti: +r.naifGercek.toFixed(4) })),
     mevcut_santral_kisintisi_MWh: Math.round(d.mevcutKisilanMaks),
+    elektrik_fiyati_TL_MWh: durum.ptf,
+    varsayimsiz_alt_sinir: manset.map((m) => ({ risk_olcusu: m.ist.toUpperCase(), ek_MW: +m.mw.toFixed(1), kisinti: +m.kisinti.toFixed(4),
+      yillik_gelir_milyon_TL: +(m.gelirTL / 1e6).toFixed(1), yillik_kisinti_bedeli_milyon_TL: +(m.bedelTL / 1e6).toFixed(1) })),
   };
 
   const fg = fiderGirdisi(), fs = fg ? fiderKapasitesi(fg) : null, fs95 = fg ? fiderKapasitesi(fiderGirdisi(0.95)!) : null;
   const fs1 = fg ? fiderKapasitesi(fiderGirdisi(1)!) : null;
 
   ana.innerHTML = `
+    <nav class="sekmeler" role="tablist" aria-label="Görünüm">
+      <button role="tab" id="tab-karar" aria-controls="sk-karar" data-sekme="karar">Karar</button>
+      <button role="tab" id="tab-bolge" aria-controls="sk-bolge" data-sekme="bolge">Bölge ve Türkiye</button>
+      <button role="tab" id="tab-kanit" aria-controls="sk-kanit" data-sekme="kanit">Kanıt</button>
+    </nav>
+
+    <div class="sekme" id="sk-karar" role="tabpanel" aria-labelledby="tab-karar" tabindex="0">
     <p class="cevap">${t.ad}: statik kurala göre ${dolu ? "<b>dolu</b>" : `<b>${tr(statik)} MW</b> boş`}. Trafodaki yük hakkında
-      <b>hiçbir varsayım yapmadan</b> bile esnek bağlantı <b>${tr(altSinir)} MW</b> açıyor${dolu ? "" : `, statik sınırın <b>${tr(altSinir - statik)} MW</b> üzerinde`}.
+      <b>hiçbir varsayım yapmadan</b> bile esnek bağlantı <b>${tr(altSinir, 1)} MW</b> açıyor${dolu ? "" : `, statik sınırın <b>${tr(altSinir - statik, 1)} MW</b> üzerinde`}.
       Bedeli: ${istAd} yeni projelerin üretiminde <b>${yuzde(kisintiAlt)}</b> kısıntı.</p>
+    <div class="manset" role="group" aria-label="Varsayımsız alt sınır, iki risk ölçüsüyle">
+      ${manset.map((m) => `<div class="manset-kol${m.ist === durum.istatistik ? " secili" : ""}">
+        <div class="mk-ad">${m.ist === "p50" ? "P50 · tipik yıl" : "P90 · kötü yıl"}<span>${m.ist === "p50" ? "planlamacının baktığı" : "bankanın istediği"}</span></div>
+        <div class="mk-mw">${tr(m.mw, 1)}<small>MW</small></div>
+        <div class="mk-satir">statik kural: <b>${tr(statik)} MW</b> · kısıntı <b>${yuzde(m.kisinti)}</b></div>
+        <div class="mk-satir">${m.ist === "p50" ? "tipik yılda" : "kötü yıl kısıntı oranıyla"} yatırımcıya ≈ <b>${milyonTL(m.gelirTL)}</b> satış · kısıntı bedeli ≈ ${milyonTL(m.bedelTL)}</div>
+      </div>`).join("")}
+    </div>
+    <p class="kucuk manset-not">Varsayımsız alt sınır: TM yükü hakkında hiçbir varsayım yok. Para karşılığı o yılda şebekeye verilen ek enerji × ${tr(durum.ptf)} TL/MWh (${durum.ptf === PTF_VARSAYILAN ? PTF_KAYNAK : "kullanıcı fiyatı"}).
+      Statik kuralda bu gelir sıfır, çünkü başvuru reddediliyor; yeni trafo merkezi gerekmiyor. Aşağıdaki kutular ve diğer sekmeler "Risk ölçüsü" ayarındaki ${durum.istatistik.toUpperCase()} seçimine göre.</p>
     <p class="cevap-alt">Bu sayı yalnızca iki şeye dayanır: TEİAŞ'ın bu TM için yayımladığı ${tr(t.maksMW)} MW üst sınırı ve bu koordinatın 20 yıllık gerçek hava verisi.
       Yük en düşük kabul edilir, yani statik kuralın kendi en kötü varsayımı korunur. Kazanç tamamen şundan gelir: GES yılın çok az saatinde tam güçte üretir.
-      TM yükü bilinirse sayı <b>${tr(esnek)} MW</b>'a çıkar; aşağıdaki merdiven bunu ayrı basamakta gösterir.</p>
+      TM yükü bilinirse sayı <b>${tr(esnek)} MW</b>'a çıkar; Kanıt sekmesindeki merdiven bunu ayrı basamakta gösterir.</p>
     <div class="olcumler">
       <div class="olcum"><div class="ad">Statik kurala göre boş</div><div class="sayi">${tr(statik)}<small>MW</small></div><div class="ek">${tr(t.tahsisMW)} / ${tr(t.maksMW)} MW tahsisli</div></div>
-      <div class="olcum vurgu"><div class="ad">Varsayımsız alt sınır</div><div class="sayi">${tr(altSinir)}<small>MW</small></div><div class="ek">yük bilgisi kullanılmadan</div></div>
+      <div class="olcum vurgu"><div class="ad">Varsayımsız alt sınır</div><div class="sayi">${tr(altSinir, 1)}<small>MW</small></div><div class="ek">yük bilgisi kullanılmadan</div></div>
       <div class="olcum"><div class="ad">Yük bilgisiyle</div><div class="sayi">${tr(esnek)}<small>MW</small></div><div class="ek">${fiderMW() ? "hat sınırı dahil" : `yük ±%50 ile ${tr(esnekAlt)}–${tr(esnekUst)} MW`}</div></div>
       <div class="olcum"><div class="ad">Bataryayla</div><div class="sayi">${bat ? tr(esnekBat) : "–"}<small>${bat ? "MW" : ""}</small></div><div class="ek">${bat ? `${tr(bat.gucMW, 0)} MW / ${tr(bat.enerjiMWh, 0)} MWh, verim %88` : "batarya kapalı"}</div></div>
       <div class="olcum"><div class="ad">Net önlenen emisyon</div><div class="sayi">${tr(co2AltNet / 1000, 1)}<small>bin tCO₂/yıl</small></div><div class="ek">varsayımsız · ${tr(ekMWhAlt / 1000, 1)} GWh · band ${tr(co2AltDus / 1000, 1)}–${tr(co2AltYuk / 1000, 1)} bin${tasinir == null ? "" : ` · taşınma payı %${tr(tasinir * 100, 1)} düşüldü`}</div></div>
     </div>
 
     <section class="bolum">
+        <h2>Planlama notu</h2>
+        <p>Gemini, yukarıdaki sayıları EDAŞ planlama mühendisi için kısa bir uyarı metnine çevirir. Sayı üretmez. Not genellikle 10–30 saniyede gelir; ücretsiz API yoğunsa biraz daha uzun sürebilir.</p>
+        <div class="gemini" id="gemini"><button class="dugme" id="ozetBtn">Planlama notu oluştur</button></div>
+    </section>
+
+    <section class="bolum">
+      <h2>Bugün kim kullanır: mevzuat beklemeden</h2>
+      <p>Türkiye'de trafo merkezi düzeyinde esnek bağlantı henüz tanımlı değil. Ama aynı ilke santral düzeyinde mevzuatta zaten var:
+        <b>kurulu güç, şebekeye verilebilen güçten büyük olabilir; fazlası şebekeye verilmez.</b></p>
+      <ul class="liste">
+        <li><b>Depolamalı santraller:</b> mekanik kurulu güç, elektriksel kurulu gücün iki katına kadar çıkabilir. Sisteme verilen güç lisanstaki kurulu gücü aşamaz; aşan enerji uzlaştırmada sayılmaz. EPDK bu modelde 33,1 GW ön lisans verdi.</li>
+        <li><b>Hibrit (yardımcı kaynak) santraller:</b> mevcut santralin bağlantısına GES eklenir, yeni kapasite tahsisi gerekmez. 3,5 GW izin verildi, 1,4 GW kuruldu. Ember'in önerisi: yatırımcı ne kadar ekleyeceğine kendisi karar versin, şebeke sınırını aşan üretim kısılsın.</li>
+      </ul>
+      <div class="hesap">
+        <label for="santralMW">Mevcut santralin bağlantı gücü</label>
+        <input id="santralMW" type="number" min="1" max="250" step="1" value="${santralMW}" /> <span>MW</span>
+        <span class="hesap-sonuc" id="santralSonuc"></span>
+      </div>
+      <p class="kucuk">Hesap, merdivenin ilk basamağıdır: yük yok, sınır santralin kendi bağlantı gücü, hava ${t.ad} konumunun gerçek verisi. Kısıntı hedefi ve risk ölçüsü soldaki ayarlardan.
+        Kaynaklar: Mondaq, "Elektrik Piyasasında Depolamalı Üretim Faaliyeti ve Lisanslama Süreci" (Lisans Yön. 12/14; 6446 s. Kanun 7/11); AA Enerji Terminali (33,1 GW);
+        Ember, "Türkiye can bypass grid constraints with hybrid solar power plants" (bölüm 2.2 ve 4.2).</p>
+    </section>
+
+    </div>
+
+    <div class="sekme" id="sk-bolge" role="tabpanel" aria-labelledby="tab-bolge" tabindex="0">
+    <section class="bolum">
+      <h2>Bölge ölçeğinde: Konya ve Karaman'daki ${TRAFOLAR.length} trafo merkezi</h2>
+      <p>Aynı yöntem bölgedeki bütün trafo merkezlerine uygulanır. Kabul edilen kısıntı, risk ölçüsü ve emisyon faktörü soldaki ayarlardan gelir.
+        Yük varsayımı üç seviyede denenir; yük bilgisi olmayan alt sınır ayrıca verilir.</p>
+      <button class="dugme" id="bolgeBtn">Bölgeyi hesapla</button>
+      <small class="kucuk">TM başına 60 senaryo (20 hava yılı × 3); hava verisi seçili TM'nin konumundan (bölge içi mesafeler ≤ 150 km). Yük tepesi = TM üst sınırının %30, %60 ve %90'ı.</small>
+      <div id="bolge"></div>
+    </section>
+
+    ${ulusalBolum()}
+
+    </div>
+
+    <div class="sekme" id="sk-kanit" role="tabpanel" aria-labelledby="tab-kanit" tabindex="0">
+    <section class="bolum">
       <h2>Kanıt merdiveni: varsayım azaldıkça sayı ne kadar sağlam?</h2>
       <p>Her basamak bir öncekinden daha az varsayım kullanır. İlk basamak TM yükü hakkında hiçbir şey varsaymaz ve TEİAŞ'ın hesap formülüne bağlı değildir.</p>
       <ol class="merdiven">
-        <li><span class="m-ad">Yük bilgisi olmadan</span><span class="m-sayi">${tr(altSinir)} MW</span>
+        <li><span class="m-ad">Yük bilgisi olmadan</span><span class="m-sayi">${tr(altSinir, 1)} MW</span>
           <span class="m-not">Tek kural: toplam üretim TEİAŞ'ın yayımladığı ${tr(t.maksMW)} MW'ı aşmasın. Yük her an en düşük kabul edilir. Kazanç sadece gerçek havadan: GES nadiren tam güçte üretir.</span></li>
         <li><span class="m-ad">Gerçek yük şekliyle</span><span class="m-sayi">${Math.round(esnekAlt) === Math.round(esnekUst) ? tr(esnekAlt) : `${tr(esnekAlt)}–${tr(esnekUst)}`} MW</span>
           <span class="m-not">EPİAŞ saatlik yük şekli, TM yük tepesi ${tr(durum.yukTepeMW * 0.5)}–${tr(durum.yukTepeMW * 1.5)} MW aralığında. Seçili varsayımla ${tr(esnek)} MW.</span></li>
@@ -423,46 +526,10 @@ async function yenile(yeniSenaryo: boolean) {
         Trafo barası gerilimini kademe değiştirici sabit tuttuğu varsayılır. Ayrıntılı yük akışı (pandapower) bağlantı etüdünün işi.</p>
     </section>` : ""}
 
-    <section class="bolum iki">
-      <div>
+    <section class="bolum">
         <h2>Kısıntı ne zaman oluyor</h2>
         <p>${tr(esnek)} MW eklendiğinde ortalama kısılan enerji. En çok ${AY[tepeAy]} öğlelerinde: güneş güçlü, yük düşük. Batarya ve talep esnekliği bu saatleri hedeflemeli.</p>
         <div id="isi"></div>
-      </div>
-      <div>
-        <h2>Planlama notu</h2>
-        <p>Gemini, yukarıdaki sayıları EDAŞ planlama mühendisi için kısa bir uyarı metnine çevirir. Sayı üretmez.</p>
-        <div class="gemini" id="gemini"><button class="dugme" id="ozetBtn">Planlama notu oluştur</button></div>
-      </div>
-    </section>
-
-    <section class="bolum">
-      <h2>Bölge ölçeğinde: Konya ve Karaman'daki ${TRAFOLAR.length} trafo merkezi</h2>
-      <p>Aynı yöntem bölgedeki bütün trafo merkezlerine uygulanır. Kabul edilen kısıntı, risk ölçüsü ve emisyon faktörü soldaki ayarlardan gelir.
-        Yük varsayımı üç seviyede denenir; yük bilgisi olmayan alt sınır ayrıca verilir.</p>
-      <button class="dugme" id="bolgeBtn">Bölgeyi hesapla</button>
-      <small class="kucuk">TM başına 60 senaryo (20 hava yılı × 3); hava verisi seçili TM'nin konumundan (bölge içi mesafeler ≤ 150 km). Yük tepesi = TM üst sınırının %30, %60 ve %90'ı.</small>
-      <div id="bolge"></div>
-    </section>
-
-    ${ulusalBolum()}
-
-    <section class="bolum">
-      <h2>Bugün kim kullanır: mevzuat beklemeden</h2>
-      <p>Türkiye'de trafo merkezi düzeyinde esnek bağlantı henüz tanımlı değil. Ama aynı ilke santral düzeyinde mevzuatta zaten var:
-        <b>kurulu güç, şebekeye verilebilen güçten büyük olabilir; fazlası şebekeye verilmez.</b></p>
-      <ul class="liste">
-        <li><b>Depolamalı santraller:</b> mekanik kurulu güç, elektriksel kurulu gücün iki katına kadar çıkabilir. Sisteme verilen güç lisanstaki kurulu gücü aşamaz; aşan enerji uzlaştırmada sayılmaz. EPDK bu modelde 33,1 GW ön lisans verdi.</li>
-        <li><b>Hibrit (yardımcı kaynak) santraller:</b> mevcut santralin bağlantısına GES eklenir, yeni kapasite tahsisi gerekmez. 3,5 GW izin verildi, 1,4 GW kuruldu. Ember'in önerisi: yatırımcı ne kadar ekleyeceğine kendisi karar versin, şebeke sınırını aşan üretim kısılsın.</li>
-      </ul>
-      <div class="hesap">
-        <label for="santralMW">Mevcut santralin bağlantı gücü</label>
-        <input id="santralMW" type="number" min="1" max="250" step="1" value="${santralMW}" /> <span>MW</span>
-        <span class="hesap-sonuc" id="santralSonuc"></span>
-      </div>
-      <p class="kucuk">Hesap, merdivenin ilk basamağıdır: yük yok, sınır santralin kendi bağlantı gücü, hava ${t.ad} konumunun gerçek verisi. Kısıntı hedefi ve risk ölçüsü soldaki ayarlardan.
-        Kaynaklar: Mondaq, "Elektrik Piyasasında Depolamalı Üretim Faaliyeti ve Lisanslama Süreci" (Lisans Yön. 12/14; 6446 s. Kanun 7/11); AA Enerji Terminali (33,1 GW);
-        Ember, "Türkiye can bypass grid constraints with hybrid solar power plants" (bölüm 2.2 ve 4.2).</p>
     </section>
 
     <section class="bolum">
@@ -491,7 +558,7 @@ async function yenile(yeniSenaryo: boolean) {
             ? (olcum.sentetik
               ? `<b>SENTETİK dosya yüklendi (${olcum.ad}) — gerçek ölçüm değildir.</b> ${olcum.satir.toLocaleString("tr")} saat, tepe ${tr(olcum.tepeMW, 1)} MW. Bu yalnızca "ölçüm geldiğinde ne olur" sorusunu göstermek içindir; buradan çıkan sayı bir iddia değildir. ${olcum.uyari ?? ""}`
               : `<b>EDAŞ ölçümü yüklendi (${olcum.ad}).</b> Varsayım yok: ${olcum.satir.toLocaleString("tr")} saatlik gerçek çekiş verisi, tepe ${tr(olcum.tepeMW, 1)} MW. ${olcum.uyari ?? ""}`)
-            : `<b>Ana sayı (${tr(altSinir)} MW) bu satırı hiç kullanmaz.</b> Yalnızca "yük bilgisiyle" üst senaryosunda devreye girer: ulusal şekil ${tr(durum.yukTepeMW)} MW tepeye ölçeklenir, en düşük gündüz yükü ${tr(s.enDusukGunduzYukMW, 1)} MW, ters akış sınırı ${tr(s.ihracatLimitiMW, 1)} MW. TM bazında gerçek yük Türkiye'de yayımlanmıyor (TEİAŞ YTBS topluyor, yayımlamıyor); EDAŞ'ın SCADA ölçümü girilince bu satır kalkar.`}</td><td><span class="etiket ${olcum ? (olcum.sentetik ? "varsayim" : "gercek") : "varsayim"}">${olcum ? (olcum.sentetik ? "SENTETİK, iddia değil" : "gerçek ölçüm") : "yalnızca üst senaryoda"}</span></td></tr>
+            : `<b>Ana sayı (${tr(altSinir, 1)} MW) bu satırı hiç kullanmaz.</b> Yalnızca "yük bilgisiyle" üst senaryosunda devreye girer: ulusal şekil ${tr(durum.yukTepeMW)} MW tepeye ölçeklenir, en düşük gündüz yükü ${tr(s.enDusukGunduzYukMW, 1)} MW, ters akış sınırı ${tr(s.ihracatLimitiMW, 1)} MW. TM bazında gerçek yük Türkiye'de yayımlanmıyor (TEİAŞ YTBS topluyor, yayımlamıyor); EDAŞ'ın SCADA ölçümü girilince bu satır kalkar.`}</td><td><span class="etiket ${olcum ? (olcum.sentetik ? "varsayim" : "gercek") : "varsayim"}">${olcum ? (olcum.sentetik ? "SENTETİK, iddia değil" : "gerçek ölçüm") : "yalnızca üst senaryoda"}</span></td></tr>
           <tr><td>Tahsisli gücün kaynağı</td><td>TEİAŞ tablosu GES ve RES'i tek sütunda veriyor. Mevcut santraller GES kabul edilir; RES olsaydı üretim profili farklı olur, öğle tepesi yerine gece de üretim olurdu. <b>Ölçüldü (18 Ekim):</b> Konya ve Karaman'da OpenStreetMap'te haritalanmış 1.300 üretim tesisinin <b>1.192'si güneş, 84'ü rüzgâr</b> — sayıca 14 kat fark. Güç etiketi taşıyanlarda da aynı yön var: 1.882,5 MW güneş, 256,4 MW rüzgâr. İkinci sayıyı tek başına kullanmıyoruz, çünkü etiketleme oranları çok farklı (güneşin %1,8'i, rüzgârın %11,9'u etiketli); değerli olan, farklı yanlılıkları olan iki ölçünün aynı yöne işaret etmesi. <b>Rüzgâr sıfır değil</b>, ama tahsisli gücü GES saymak bu bölgede savunulabilir. Üretici: <code>model/kaynak_kirilimi.py</code>, kaynak OpenStreetMap (ODbL). Bu ölçüm TEİAŞ'ın tahsisli güç sütununu <i>karşılamaz</i> — o sütun kurulmamış tahsisleri de sayıyor, OSM ise yalnızca sahada olanı görüyor ve küçük çatı GES'lerini kaçırıyor. Tam ayrıştırma için EDAŞ fider verisi gerekiyor; MEDAŞ'tan 17 Ekim'de istendi.</td><td><span class="etiket varsayim">varsayım, etkisi sınırlı</span></td></tr>
           <tr><td>Bağlantı hattı gerilimi</td><td>${fider ? `${tr(fider, 1)} MW sınır uygulanıyor.` : "Soldan hat uzunluğu ve iletken seçilince açılır; şu an kapalı."} Kısa hat formülü (ΔU ≈ L·(R·P − X·Q)/U²) ve katalog iletken verisi (Southwire); %2 sınırı VDE-AR-N 4110. Formül pandapower yük akışına karşı 150 durumda sınandı (3 iletken × 5 mesafe × 2 cosφ): 25 kapasite durumunun <b>hiçbirinde</b> gerçek kapasiteden büyük sayı vermiyor, en iyimser gerilim sapması 0,02 puan — yani her durumda muhafazakâr. cosφ&lt;1'de sapma büyüyor çünkü R·P ile X·Q birbirini götürünce ihmal edilen ikinci dereceden terim göreli olarak büyüyor; yönü yine muhafazakâr. <b>Önemli sınır:</b> bu sonuç, santralin TM'den çıkan kendi hattında olduğu durum içindir. Gerçekçi bir OG fideri modellendiğinde (10 bara, dağıtık yük) ara yükler ve fiderin ortasına bağlanma kontrolü daha da muhafazakâr yapıyor; ama <b>aynı fiderde başka üretim varsa kontrol iyimser hale geliyor</b> — fiderde 20 MW mevcut GES varken 16,6 MW diyor, gerçek sınır 7,6 MW. Paylaşılan fiderde bu sayıya güvenilmez; bağlantı etüdü fiderin tamamına bakmalıdır. Kademe değiştirici, dallanma ve N-1 kapsam dışı.</td><td><span class="etiket ${fider ? "gercek" : "istege"}">${fider ? "mühendislik hesabı, açık" : "isteğe bağlı; formül doğrulandı"}</span></td></tr>
           <tr><td>Koruma ve kısa devre</td><td>Röle ayarları ve akım trafosu oranları yayımlanmaz, o yüzden koruma etüdü burada yapılamaz. Ama etüdün başladığı sayı hesaplandı (IEC 60909, pandapower): eviricili GES arıza akımını anma akımının 1,1 katıyla sınırlar, 40 MW'ta toplam arıza akımı yalnızca %22 artıyor — kesici dayanımını tek başına zorlamaz. Asıl soru <b>ara besleme</b>: santral arızaya kendi payını bastığı için TM rölesi arıza akımının tamamını görmez, sınanan en kötü durumda %19'unu görmüyor. Röle ayarı buna göre gözden geçirilmezse açma süresi uzar. Esnek bağlantıda bağlanan güç statik kuraldan büyük olduğu için bu etüt önkoşuldur.</td><td><span class="etiket istege">ilk sayı hesaplandı, etüt EDAŞ'ta</span></td></tr>
@@ -500,12 +567,15 @@ async function yenile(yeniSenaryo: boolean) {
       </table>
     </section>
 
+    </div>
+
     <footer class="alt">
       Hesap tamamen tarayıcıda çalışır; sabit seed (42) ile tekrarlanabilir. Mevcut santrallerin kısıntısı bu senaryoda: ${tr(d.mevcutKisilanMaks)} MWh/yıl.
       Bu bir prototiptir: bağlantı kararı için EDAŞ'ın yük ölçümü ve bağlantı etüdü gerekir.
       Veri: Open-Meteo (CC BY 4.0), ERA5/Copernicus; EPİAŞ Şeffaflık Platformu; TEİAŞ; ETKB; IPCC AR5; Ember. Climathon 2026, Siemens × YGA × UP School.
     </footer>`;
 
+  sekmeleriBagla();
   document.getElementById("egri")!.appendChild(egriGrafigi(nokta, durum.hedef, statik, esnek, durum.istatistik));
   document.getElementById("isi")!.appendChild(isiHaritasi(isi));
   document.getElementById("dogrulama")!.appendChild(dogrulamaGrafigi(rapor.ornek_hafta));
@@ -524,6 +594,28 @@ async function yenile(yeniSenaryo: boolean) {
   santralHesapla();
 }
 let santralMW = 50;
+
+/** Tek link, üç görünüm: Karar (EDAŞ mühendisi / yatırımcı), Bölge ve Türkiye (yönetici), Kanıt (teknik jüri). İçerik aynı, yalnızca gruplama. */
+function sekmeleriBagla() {
+  const sira: Sekme[] = ["karar", "bolge", "kanit"];
+  const goster = () => {
+    document.querySelectorAll<HTMLButtonElement>("[data-sekme]").forEach((b) => {
+      const secili = b.dataset.sekme === sekme;
+      b.setAttribute("aria-selected", String(secili)); b.tabIndex = secili ? 0 : -1;
+    });
+    (["karar", "bolge", "kanit"] as const).forEach((k) => { document.getElementById(`sk-${k}`)!.hidden = k !== sekme; });
+  };
+  document.querySelectorAll<HTMLButtonElement>("[data-sekme]").forEach((b) =>
+    b.addEventListener("click", () => { sekme = b.dataset.sekme as Sekme; goster(); urlYaz(); }));
+  document.querySelector(".sekmeler")!.addEventListener("keydown", (e) => {
+    const k = (e as KeyboardEvent).key;
+    if (k !== "ArrowRight" && k !== "ArrowLeft") return;
+    const i = (sira.indexOf(sekme) + (k === "ArrowRight" ? 1 : sira.length - 1)) % sira.length;
+    sekme = sira[i]; goster(); urlYaz();
+    document.getElementById(`tab-${sekme}`)!.focus();
+  });
+  goster();
+}
 
 interface BolgeSatiri {
   ad: string; statik: number; alt: number; e30: number; e60: number; e90: number;
@@ -672,7 +764,7 @@ async function olcumYukle(e: Event) {
 async function ozetIste() {
   const kutu = document.getElementById("gemini")!;
   const btn = document.getElementById("ozetBtn") as HTMLButtonElement;
-  btn.disabled = true; btn.textContent = "Not yazılıyor…";
+  btn.disabled = true; btn.textContent = "Not yazılıyor… (genellikle 10–30 sn)";
   try {
     const r = await fetch("/api/ozet", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sonOzet) });
     const j = await r.json();
