@@ -32,14 +32,19 @@ function sablon(o: any): string {
 /** Markdown işaretlerini temizler; arayüz düz paragraf bekliyor. */
 const duzelt = (s: string) => s.trim().replace(/\*\*/g, "").replace(/^#+\s*/gm, "");
 
+/** Tek dil modeli çağrısının süre sınırı; toplam süre Vercel'in 20 sn sınırının altında kalır. */
+const CAGRI_MS = 6000;
+const BASLANGIC = { t: 0 };
+
 /** Geçici hatada (yoğunluk, 429/5xx) kısa beklemeyle yeniden dener; kalıcı hatada hemen bırakır. */
-async function tekrarla<T>(f: () => Promise<T>, deneme = 3): Promise<T> {
+async function tekrarla<T>(f: () => Promise<T>, deneme = 2): Promise<T> {
   let son: unknown;
   for (let i = 0; i < deneme; i++) {
+    if (Date.now() - BASLANGIC.t > 9000) break; // fonksiyonun 20 sn sınırı: şablona yer bırak
     try { return await f(); } catch (e) {
       son = e;
-      if (!/high demand|overloaded|unavailable|rate|quota|429|500|502|503|504/i.test((e as Error).message)) break;
-      if (i < deneme - 1) await new Promise((r) => setTimeout(r, 1500 * (i + 1)));
+      if (!/high demand|overloaded|unavailable|rate|quota|429|500|502|503|504|timeout|abort/i.test((e as Error).message)) break;
+      if (i < deneme - 1) await new Promise((r) => setTimeout(r, 1000));
     }
   }
   throw son;
@@ -47,7 +52,7 @@ async function tekrarla<T>(f: () => Promise<T>, deneme = 3): Promise<T> {
 
 async function gemini(o: any, anahtar: string) {
   const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
-    method: "POST",
+    method: "POST", signal: AbortSignal.timeout(CAGRI_MS),
     headers: { "Content-Type": "application/json", "x-goog-api-key": anahtar },
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: TALIMAT }] },
@@ -68,7 +73,7 @@ async function gemini(o: any, anahtar: string) {
 async function claude(o: any, anahtar: string) {
   const model = process.env.CLAUDE_MODEL || "claude-haiku-4-5";
   const r = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
+    method: "POST", signal: AbortSignal.timeout(CAGRI_MS),
     headers: { "Content-Type": "application/json", "x-api-key": anahtar, "anthropic-version": "2023-06-01" },
     body: JSON.stringify({
       model, max_tokens: 1024, temperature: 0.2, system: TALIMAT,
@@ -87,6 +92,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") return res.status(405).json({ hata: "Sadece POST" });
   const o = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
   if (!o || typeof o !== "object" || !o.trafo) return res.status(400).json({ hata: "Simülasyon özeti eksik" });
+  BASLANGIC.t = Date.now();
 
   // Sağlayıcı sırası: SAGLAYICI=claude ile Claude öne alınır. Biri düşerse diğeri, o da yoksa şablon.
   const g = process.env.GEMINI_API_KEY, c = process.env.ANTHROPIC_API_KEY;
@@ -101,6 +107,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const hatalar: string[] = [];
   for (const dene of sira) {
+    if (Date.now() - BASLANGIC.t > 12000) { hatalar.push("timeout"); break; }
     try {
       return res.status(200).json(await dene());
     } catch (e) {
@@ -110,7 +117,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   return res.status(200).json({
     metin: sablon(o), kaynak: "sablon",
     uyari: !hatalar.length ? "dil modeli anahtarı tanımlı değil"
-      : hatalar.some((h) => /high demand|overloaded|unavailable|rate|quota|429|503/i.test(h))
+      : hatalar.some((h) => /high demand|overloaded|unavailable|rate|quota|429|503|timeout|abort/i.test(h))
         ? "Gemini şu an yoğun; sayılar aynı, not şablonla yazıldı. Birkaç saniye sonra tekrar deneyebilirsiniz"
         : "dil modeline ulaşılamadı; sayılar aynı, not şablonla yazıldı",
   });

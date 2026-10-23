@@ -767,7 +767,8 @@ async function ozetIste() {
   btn.disabled = true; btn.textContent = "Not yazılıyor… (genellikle 10–30 sn)";
   try {
     const r = await fetch("/api/ozet", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sonOzet) });
-    const j = await r.json();
+    const j = await r.json().catch(() => null);
+    if (!j) throw new Error("dil modeli zamanında cevap vermedi. Sayılar yukarıda; birkaç saniye sonra tekrar deneyebilirsiniz");
     if (!r.ok) throw new Error(j.hata || r.statusText);
     kutu.innerHTML = j.metin.split(/\n+/).filter(Boolean).map((p: string) => `<p>${p.replace(/</g, "&lt;")}</p>`).join("") +
       `<p class="kaynak">${j.kaynak === "sablon"
